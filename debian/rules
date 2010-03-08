@@ -1,0 +1,137 @@
+#! /usr/bin/make -f
+
+DEB_BUILD_GNU_TYPE ?= $(shell dpkg-architecture -qDEB_BUILD_GNU_TYPE)
+DEB_HOST_GNU_TYPE ?= $(shell dpkg-architecture -qDEB_HOST_GNU_TYPE)
+
+DEB_HOST_ARCH ?= $(shell dpkg-architecture -qDEB_HOST_ARCH)
+
+ifeq ($(DEB_BUILD_GNU_TYPE),$(DEB_HOST_GNU_TYPE))
+CROSS =
+else
+ifeq ($(shell which $(DEB_HOST_GNU_TYPE)-gcc),)
+$(warning Can not find $(DEB_HOST_GNU_TYPE)-gcc)
+ifeq ($(DEB_BUILD_GNU_TYPE),$(subst uclibc,gnu,$(DEB_HOST_GNU_TYPE)))
+$(warning -> Using native compiler instead)
+CROSS =
+else
+ifneq ($(shell which $(subst uclibc,gnu,$(DEB_HOST_GNU_TYPE))-gcc),)
+$(warning -> Using $(subst uclibc,gnu,$(DEB_HOST_GNU_TYPE))-gcc instead)
+CROSS = $(subst uclibc,gnu,$(DEB_HOST_GNU_TYPE))-
+else
+$(error No $(subst uclibc,gnu,$(DEB_HOST_GNU_TYPE))-gcc either.)
+endif
+endif
+else
+CROSS = $(DEB_HOST_GNU_TYPE)-
+endif
+endif
+
+parallel = $(patsubst parallel=%,-j%,$(filter parallel=%,$(DEB_BUILD_OPTIONS)))
+
+version = 0.9.30.2
+
+pwd = $(shell pwd)
+
+packages_arch_uclibc_linux_amd64_debian = uclibc$(version) uclibc-dev
+packages_arch_uclibc_linux_armel_debian = uclibc$(version) uclibc-dev
+packages_arch_uclibc_linux_armebuc_debian = uclibc$(version) uclibc-dev
+packages_arch_uclibc_linux_powerpc_debian = uclibc$(version) uclibc-dev
+packages_arch_uclibc_linux_emdebian = libc$(version)uc libm$(version)uc
+
+packages_indep_debian = uclibc-source
+
+config_uclibc_linux_amd64_debian = config-amd64
+config_uclibc_linux_armel_debian = config-armel
+config_uclibc_linux_armebuc_debian = config-armebuc
+config_uclibc_linux_powerpc_debian = config-powerpc
+
+arch_uclibc_linux_amd64_debian = x86_64
+arch_uclibc_linux_armel_debian = arm
+arch_uclibc_linux_armebuc_debian = arm
+arch_uclibc_linux_powerpc_debian = powerpc
+
+vendor = $(shell \
+    dpkg-vendor --derives-from emdebian && echo emdebian || \
+    dpkg-vendor --derives-from debian && echo debian)
+
+ifeq ($(vendor),)
+$(error Vendor not supported)
+endif
+
+host = $(subst -,_,$(DEB_HOST_ARCH))
+
+type = $(host)_$(vendor)
+
+config = $(config_$(type))
+arch = $(arch_$(type))
+
+packages_arch = $(packages_arch_$(type))
+packages_indep = $(packages_indep_$(vendor))
+
+ifneq ($(packages_arch),)
+ifeq ($(config),)
+$(error No configuration)
+endif
+ifeq ($(arch),)
+$(error No mapping from Debian to uClibc arch name)
+endif
+endif
+
+build: build-arch build-indep
+build-arch: $(packages_arch:%=build-%)
+build-indep: $(packages_indep:%=build-%)
+
+binary: binary-arch binary-indep
+binary-arch: $(packages_arch:%=binary-%)
+	@
+binary-indep: $(packages_indep:%=binary-%)
+	@
+
+clean:
+	dh_testdir
+	dh_testroot
+	dh_clean
+	$(RM) -r build
+
+build-uclibc$(version): build-default
+
+build-default: build/default/.config
+	$(MAKE) $(parallel) libs O=$(pwd)/build/default ARCH=$(arch) CROSS=$(CROSS)
+
+build/default/.config: debian/$(config)
+	dh_testdir
+	mkdir -p build/default
+	cp $< $@
+
+ifneq ($(interactive),)
+debian/$(config):
+	dh_testdir
+	mkdir -p build/default
+	$(MAKE) $(parallel) menuconfig O=$(pwd)/build/default ARCH=$(arch)
+	cp build/default/.config $@
+endif
+
+build-uclibc-source: build/uClibc-$(version).tar.bz2
+
+build/uClibc-$(version).tar.bz2: build/uClibc-$(version).tar
+	bzip2 -9k <$< >$@
+
+build/uClibc-$(version).tar:
+	dh_testdir
+	mkdir -p build
+	tar -cf $@ --exclude=./build --transform s@^\.@uClibc-$(version)@ .
+
+binary-%: build-%
+	dh_testdir
+	dh_testroot
+	dh_prep -p$*
+	dh_installchangelogs -p$*
+	dh_installdocs -p$*
+	dh_install -p$*
+	dh_compress -p$*
+	dh_fixperms -p$*
+	dh_installdeb -p$*
+	dh_shlibdeps -p$*
+	dh_gencontrol -p$*
+	dh_md5sums -p$*
+	dh_builddeb -p$*

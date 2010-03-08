@@ -1,0 +1,103 @@
+This package was debianized by Simon Richter <sjr@debian.org> on
+Mon Dec  7 17:52:18 CET 2009
+
+It was downloaded from http://www.uclibc.org/downloads/
+
+Upstream Author: Erik Andersen <andersen@codepoet.net>
+
+Copyright: 
+    ARM Ltd. 2002
+    Alexandre Oliva 2004
+    Analog Devices Inc. 2004
+    Apple Computer, Inc. 1991, 1992, 1993, 1994, 1995, 1996, 1997, 1998, 1999,
+      2000, 2001
+    Axis Communications AB 2002, 2003, 2004
+    BitWagon Software LLC 2000
+    Carnegie Mellon University 1989
+    Christophe Massiot 2003
+    Craig Metz 1996
+    David A. Schleef 2001, 2002
+    David Burren 1994
+    David Engel 1994, 1995, 1996, 1997, 1998, 1999, 2000
+    David McCullough 2002
+    Digital Equipment Corporation 1993
+    Eric Youngsdale 1994, 1995, 1996, 1997, 1998, 1999, 2000
+    Erik Andersen 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006
+    Free Software Foundation, Inc. 1984, 1985, 1986, 1987, 1988, 1989, 1990,
+      1991, 1992, 1993, 1994, 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002,
+      2003, 2004, 2005, 2006
+    George Thanos 2002, 2003
+    Hewlett-Packard 2001
+    Intel Corporation 1993
+    Internet Software Consortium 1996, 1997, 1998, 1999
+    Joakim Tjernlund 2004, 2005
+    John Williams 2003
+    Justus Pendleton 2003
+    Kazumoto Kojima 1996, 1997, 1998, 1999, 2000, 2001
+    Kenneth Albanowski 1998
+    Lineo, Inc. 2000
+    Manuel Novoa III 2000, 2001, 2002, 2003, 2004, 2005
+    Metrowerks 2003
+    Michael Deutschmann 1996
+    Microtronix Datacom Ltd. 2004, 2005, 2006
+    Mike Frysinger 2005
+    Miles Bader 2001, 2002, 2003
+    Mitch D'Souza 1994, 1995, 1996, 1997, 1998, 1999, 2000
+    NEC Corporation 2001, 2002, 2003
+    Nat Friedman 1995, 1996
+    Paolo Alberelli 2000, 2001
+    Paul Mundt 2003, 2004, 2005
+    Peter Kjellerstedt 2005
+    Peter MacDonald 1994, 1995, 1996, 1997, 1998, 1999, 2000
+    RSA Data Security, Inc. 1991, 1992
+    Ralf Baechle 1995, 1999
+    Red Hat, Inc. 2003, 2004
+    Regents of the University of California 1982, 1983, 1986, 1987
+    Rick Sladkey 1993
+    Rickard E. Faith 1995
+    Robert de Bath 1995, 1996
+    Roman Zippel 2002, 2003, 2004, 2005
+    Sam Ravnborg 2002, 2003, 2004, 2005
+    Silicon Graphics 1995, 1999
+    Stefan Allius 2002
+    Stephen Deering 1988
+    Steven J. Hill 2002
+    Sun Microsystems, Inc. 1984, 1985, 1986, 1987, 1988, 1993
+    SuperH Ltd. 2002
+    The NetBSD Foundation, Inc. 1997
+    Xavier Leroy 1996, 1997, 1998
+    Yggdrasil Computing, Inc. 1995
+    Yoshinori Sato 2004
+
+License:
+
+There are three different licenses in use throughout the package, notably
+the LGPL (which applies to most of the files), the GPL (applying to the
+configuration system and some of the tools used for building) and the BSD
+license (some header files). When looking at the source code, please check
+the individual files' headers.
+
+If you are using the binary packages, the LGPL applies to you, as the GPLed
+portions do not become part of the binaries, and the BSD license permits
+relicensing, so the LGPL takes precedence:
+
+    This package is free software; you can redistribute it and/or
+    modify it under the terms of the GNU Lesser General Public
+    License as published by the Free Software Foundation; either
+    version 2 of the License, or (at your option) any later version.
+
+    This package is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+    Lesser General Public License for more details.
+
+    You should have received a copy of the GNU Lesser General Public
+    License along with this package; if not, write to the Free Software
+    Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301 USA
+
+On Debian systems, the complete text of the GNU Lesser General
+Public License can be found in `/usr/share/common-licenses/LGPL'.
+
+The Debian packaging is (C) 2009, Simon Richter <sjr@debian.org> and
+is licensed under the GPL, see `/usr/share/common-licenses/GPL'.
+

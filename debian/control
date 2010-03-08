@@ -1,0 +1,149 @@
+Source: uclibc
+Section: libs
+Priority: extra
+Maintainer: Simon Richter <sjr@debian.org>
+Build-Depends: linux-libc-dev, debhelper (>= 7)
+Standards-Version: 3.8.3
+
+Package: uclibc-source
+Section: devel
+Architecture: all
+Description: Small C library implementation - source
+ uClibc is an implementation of the standard C library that is much smaller
+ than glibc, which makes it useful for embedded systems. This package provides
+ only the run-time libraries.
+ .
+ This package provides the source code for the library, for toolchain
+ bootstrap purposes.
+
+Package: libuclibc-dev
+Section: libdevel
+Architecture: any
+Depends: uclibc0.9.30.2 (= ${binary:Version})
+Description: Small C library implementation - development files
+ uClibc is an implementation of the standard C library that is much smaller
+ than glibc, which makes it useful for embedded systems. This package provides
+ only the run-time libraries.
+ .
+ This package provides the necessary headers and static libraries for compiling
+ and linking programs against uClibc.
+
+Package: libuclibc-pic
+Section: libdevel
+Architecture: any
+Description: Small C library implementation - PIC static library
+ uClibc is an implementation of the standard C library that is much smaller
+ than glibc, which makes it useful for embedded systems. This package provides
+ only the run-time libraries.
+ .
+ This package provides a static archive of the individual functions, but
+ compiled appropriately for shared libraries. This allows building a reduced
+ variant of the shared library that is smaller, but only guaranteed to work
+ with a fixed set of applications.
+
+Package: uclibc0.9.30.2
+Section: libs
+Architecture: any
+Description: Small C library implementation - runtime libraries
+ uClibc is an implementation of the standard C library that is much smaller
+ than glibc, which makes it useful for embedded systems. This package provides
+ only the run-time libraries.
+ .
+ This package provides the run-time binaries.
+
+Package: uclibc32-0.9.30.2
+Section: libs
+Architecture: any
+Description: Small C library implementation - 32 bit runtime libraries
+ uClibc is an implementation of the standard C library that is much smaller
+ than glibc, which makes it useful for embedded systems. This package provides
+ only the run-time libraries.
+ .
+ This package provides the run-time binaries for the 32 bit variant of this
+ architecture.
+
+Package: uclibc64-0.9.30.2
+Section: libs
+Architecture: any
+Description: Small C library implementation - 64 bit runtime libraries
+ uClibc is an implementation of the standard C library that is much smaller
+ than glibc, which makes it useful for embedded systems. This package provides
+ only the run-time libraries.
+ .
+ This package provides the run-time binaries for the 64 bit variant of this
+ architecture.
+
+Package: uclibc0.9.30.2-multilib
+Section: libs
+Architecture: any
+Description: Small C library implementation - non-standard runtime libraries
+ uClibc is an implementation of the standard C library that is much smaller
+ than glibc, which makes it useful for embedded systems. This package provides
+ only the run-time libraries.
+ .
+ This package provides the run-time binaries for ABIs different from the
+ system default.
+
+Package: libc0.9.30.2uc
+Section: libs
+Architecture: any
+Description: Small C library implementation - C library
+ uClibc is an implementation of the standard C library that is much smaller
+ than glibc, which makes it useful for embedded systems. This package provides
+ only the run-time libraries.
+ .
+ This package provides the C library.
+
+Package: lib32c0.9.30.2uc
+Section: libs
+Architecture: any
+Description: Small C library implementation - 32 bit C library
+ uClibc is an implementation of the standard C library that is much smaller
+ than glibc, which makes it useful for embedded systems. This package provides
+ only the run-time libraries.
+ .
+ This package provides the C library, compiled for a 32 bit execution
+ environment.
+
+Package: lib64c0.9.30.2uc
+Section: libs
+Architecture: any
+Description: Small C library implementation - 64 bit C library
+ uClibc is an implementation of the standard C library that is much smaller
+ than glibc, which makes it useful for embedded systems. This package provides
+ only the run-time libraries.
+ .
+ This package provides the C library, compiled for a 64 bit execution
+ environment.
+
+Package: libm0.9.30.2uc
+Section: libs
+Architecture: any
+Description: Small C library implementation - C library
+ uClibc is an implementation of the standard C library that is much smaller
+ than glibc, which makes it useful for embedded systems. This package provides
+ only the run-time libraries.
+ .
+ This package provides the mathematical library.
+
+Package: lib32m0.9.30.2uc
+Section: libs
+Architecture: any
+Description: Small C library implementation - C library
+ uClibc is an implementation of the standard C library that is much smaller
+ than glibc, which makes it useful for embedded systems. This package provides
+ only the run-time libraries.
+ .
+ This package provides the mathematical library, compiled for a 32 bit
+ execution environment.
+
+Package: lib64m0.9.30.2uc
+Section: libs
+Architecture: any
+Description: Small C library implementation - C library
+ uClibc is an implementation of the standard C library that is much smaller
+ than glibc, which makes it useful for embedded systems. This package provides
+ only the run-time libraries.
+ .
+ This package provides the mathematical library, compiled for a 64 bit
+ execution environment.
