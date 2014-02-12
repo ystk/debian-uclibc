@@ -109,7 +109,7 @@ else if (dpnt->d_tag == DT_MIPS_SYMTABNO) \
      dynamic[DT_MIPS_SYMTABNO_IDX] = dpnt->d_un.d_val; \
 else if (dpnt->d_tag == DT_MIPS_PLTGOT) \
      dynamic[DT_MIPS_PLTGOT_IDX] = dpnt->d_un.d_val; \
-else if (dpnt->d_tag == DT_MIPS_RLD_MAP) \
+else if ((dpnt->d_tag == DT_MIPS_RLD_MAP) && (dpnt->d_un.d_ptr)) \
      *(ElfW(Addr) *)(dpnt->d_un.d_ptr) =  (ElfW(Addr)) debug_addr; \
 } while (0)
 
@@ -149,6 +149,8 @@ do {										\
 /* Used for error messages */
 #define ELF_TARGET "MIPS"
 
+/* Need bootstrap relocations */
+#define ARCH_NEEDS_BOOTSTRAP_RELOCS
 
 unsigned long __dl_runtime_resolve(unsigned long sym_index,
 	unsigned long old_gpreg);
@@ -161,9 +163,25 @@ void _dl_perform_mips_global_got_relocations(struct elf_resolve *tpnt, int lazy)
 #define OFFS_ALIGN (0x10000000000UL-0x1000)
 #endif	/* O32 || N32 */
 
-#define elf_machine_type_class(type) \
-  ((((type) == R_MIPS_JUMP_SLOT) * ELF_RTYPE_CLASS_PLT)	\
+#if defined USE_TLS
+# if _MIPS_SIM == _MIPS_SIM_ABI64
+# define elf_machine_type_class(type) 					\
+  ((((type) == R_MIPS_JUMP_SLOT || (type) == R_MIPS_TLS_DTPMOD64	\
+     || (type) == R_MIPS_TLS_DTPREL64 || (type) == R_MIPS_TLS_TPREL64)	\
+    * ELF_RTYPE_CLASS_PLT)						\
    | (((type) == R_MIPS_COPY) * ELF_RTYPE_CLASS_COPY))
+# else
+# define elf_machine_type_class(type)					\
+  ((((type) == R_MIPS_JUMP_SLOT || (type) == R_MIPS_TLS_DTPMOD32	\
+     || (type) == R_MIPS_TLS_DTPREL32 || (type) == R_MIPS_TLS_TPREL32)	\
+    * ELF_RTYPE_CLASS_PLT)						\
+   | (((type) == R_MIPS_COPY) * ELF_RTYPE_CLASS_COPY))
+# endif /* _MIPS_SIM == _MIPS_SIM_ABI64 */
+#else
+#define elf_machine_type_class(type)					\
+  ((((type) == R_MIPS_JUMP_SLOT) * ELF_RTYPE_CLASS_PLT)			\
+   | (((type) == R_MIPS_COPY) * ELF_RTYPE_CLASS_COPY))
+#endif /* USE_TLS */
 
 #define OFFSET_GP_GOT 0x7ff0
 

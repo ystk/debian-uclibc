@@ -56,7 +56,7 @@ unsigned long __dl_runtime_resolve(unsigned long sym_index,
 	symname = strtab + sym->st_name;
 
 	new_addr = (unsigned long) _dl_find_hash(symname,
-			tpnt->symbol_scope, tpnt, ELF_RTYPE_CLASS_PLT);
+			tpnt->symbol_scope, tpnt, ELF_RTYPE_CLASS_PLT, NULL);
 	if (unlikely(!new_addr)) {
 		_dl_dprintf (2, "%s: can't resolve symbol '%s'\n",
 				_dl_progname, symname);
@@ -111,7 +111,7 @@ __dl_runtime_pltresolve(struct elf_resolve *tpnt, int reloc_entry)
 	got_addr = (char **)instr_addr;
 
 	/* Get the address of the GOT entry. */
-	new_addr = _dl_find_hash(symname, tpnt->symbol_scope, tpnt, ELF_RTYPE_CLASS_PLT);
+	new_addr = _dl_find_hash(symname, tpnt->symbol_scope, tpnt, ELF_RTYPE_CLASS_PLT, NULL);
 	if (unlikely(!new_addr)) {
 		_dl_dprintf(2, "%s: can't resolve symbol '%s' in lib '%s'.\n", _dl_progname, symname, tpnt->libname);
 		_dl_exit(1);
@@ -148,7 +148,7 @@ int _dl_parse_relocation_information(struct dyn_elf *xpnt,
 	unsigned long rel_addr, unsigned long rel_size)
 {
 	ElfW(Sym) *symtab;
-	ElfW(Rel) *rpnt;
+	ELF_RELOC *rpnt;
 	char *strtab;
 	unsigned long i;
 	unsigned long *got;
@@ -156,20 +156,20 @@ int _dl_parse_relocation_information(struct dyn_elf *xpnt,
 	unsigned long symbol_addr;
 	int reloc_type, symtab_index;
 	struct elf_resolve *tpnt = xpnt->dyn;
+	char *symname = NULL;
 #if defined (__SUPPORT_LD_DEBUG__)
 	unsigned long old_val=0;
 #endif
 
 	/* Now parse the relocation information */
 	rel_size = rel_size / sizeof(ElfW(Rel));
-	rpnt = (ElfW(Rel) *) rel_addr;
+	rpnt = (ELF_RELOC *) rel_addr;
 
 	symtab = (ElfW(Sym) *) tpnt->dynamic_info[DT_SYMTAB];
 	strtab = (char *) tpnt->dynamic_info[DT_STRTAB];
 	got = (unsigned long *) tpnt->dynamic_info[DT_PLTGOT];
 
 	for (i = 0; i < rel_size; i++, rpnt++) {
-		char *symname = NULL;
 		reloc_addr = (unsigned long *) (tpnt->loadaddr +
 			(unsigned long) rpnt->r_offset);
 		reloc_type = ELF_R_TYPE(rpnt->r_info);
@@ -178,22 +178,92 @@ int _dl_parse_relocation_information(struct dyn_elf *xpnt,
 
 		debug_sym(symtab,strtab,symtab_index);
 		debug_reloc(symtab,strtab,rpnt);
+		symname = strtab + symtab[symtab_index].st_name;
 #if defined (__SUPPORT_LD_DEBUG__)
 		if (reloc_addr)
 			old_val = *reloc_addr;
 #endif
 
 		if (reloc_type == R_MIPS_JUMP_SLOT || reloc_type == R_MIPS_COPY) {
-			symname = strtab + symtab[symtab_index].st_name;
 			symbol_addr = (unsigned long)_dl_find_hash(symname,
 								   tpnt->symbol_scope,
 								   tpnt,
-								   elf_machine_type_class(reloc_type));
+								   elf_machine_type_class(reloc_type), NULL);
 			if (unlikely(!symbol_addr && ELF32_ST_BIND(symtab[symtab_index].st_info) != STB_WEAK))
 				return 1;
 		}
+		if (!symtab_index) {
+			/* Relocs against STN_UNDEF are usually treated as using a
+			* symbol value of zero, and using the module containing the
+			* reloc itself.
+			*/
+			symbol_addr = symtab[symtab_index].st_value;
+		}
 
 		switch (reloc_type) {
+#if defined USE_TLS && USE_TLS
+# if _MIPS_SIM == _MIPS_SIM_ABI64
+		case R_MIPS_TLS_DTPMOD64:
+		case R_MIPS_TLS_DTPREL64:
+		case R_MIPS_TLS_TPREL64:
+# else
+		case R_MIPS_TLS_DTPMOD32:
+		case R_MIPS_TLS_DTPREL32:
+		case R_MIPS_TLS_TPREL32:
+# endif
+			{
+				struct elf_resolve *tls_tpnt = NULL;
+				struct symbol_ref sym_ref;
+				sym_ref.sym =  &symtab[symtab_index];
+				sym_ref.tpnt =  NULL;
+
+				if (ELF32_ST_BIND(symtab[symtab_index].st_info) != STB_LOCAL) {
+					symbol_addr = (unsigned long) _dl_find_hash(symname, tpnt->symbol_scope,
+						tpnt, elf_machine_type_class(reloc_type), &sym_ref);
+					tls_tpnt = sym_ref.tpnt;
+				}
+			    /* In case of a TLS reloc, tls_tpnt NULL means we have an 'anonymous'
+			       symbol.  This is the case for a static tls variable, so the lookup
+			       module is just that one is referencing the tls variable. */
+			    if (!tls_tpnt)
+			        tls_tpnt = tpnt;
+
+				switch (reloc_type) {
+					case R_MIPS_TLS_DTPMOD64:
+					case R_MIPS_TLS_DTPMOD32:
+						if (tls_tpnt)
+							*(ElfW(Word) *)reloc_addr = tls_tpnt->l_tls_modid;
+#ifdef __SUPPORT_LD_DEBUG__
+						_dl_dprintf(2, "TLS_DTPMOD : %s, %d, %d\n",
+							symname, old_val, *((unsigned int *)reloc_addr));
+#endif
+						break;
+
+					case R_MIPS_TLS_DTPREL64:
+					case R_MIPS_TLS_DTPREL32:
+						*(ElfW(Word) *)reloc_addr +=
+							TLS_DTPREL_VALUE (symbol_addr);
+#ifdef __SUPPORT_LD_DEBUG__
+						_dl_dprintf(2, "TLS_DTPREL : %s, %x, %x\n",
+							symname, old_val, *((unsigned int *)reloc_addr));
+#endif
+						break;
+
+					case R_MIPS_TLS_TPREL32:
+					case R_MIPS_TLS_TPREL64:
+						CHECK_STATIC_TLS((struct link_map *)tls_tpnt);
+						*(ElfW(Word) *)reloc_addr +=
+							TLS_TPREL_VALUE (tls_tpnt, symbol_addr);
+#ifdef __SUPPORT_LD_DEBUG__
+						_dl_dprintf(2, "TLS_TPREL  : %s, %x, %x\n",
+							symname, old_val, *((unsigned int *)reloc_addr));
+#endif
+						break;
+				}
+
+				break;
+			}
+#endif /* USE_TLS */
 #if _MIPS_SIM == _MIPS_SIM_ABI64
 		case (R_MIPS_64 << 8) | R_MIPS_REL32:
 #else	/* O32 || N32 */
@@ -238,12 +308,12 @@ int _dl_parse_relocation_information(struct dyn_elf *xpnt,
 				_dl_dprintf(2, "\n%s: ",_dl_progname);
 
 				if (symtab_index)
-					_dl_dprintf(2, "symbol '%s': ", strtab + symtab[symtab_index].st_name);
+					_dl_dprintf(2, "symbol '%s': ", symname);
 
 #if defined (__SUPPORT_LD_DEBUG__)
-				_dl_dprintf(2, "can't handle reloc type %s\n ", _dl_reltypes(reloc_type));
+				_dl_dprintf(2, "can't handle reloc type '%s' in lib '%s'\n", _dl_reltypes(reloc_type), tpnt->libname);
 #else
-				_dl_dprintf(2, "can't handle reloc type %x\n", reloc_type);
+				_dl_dprintf(2, "can't handle reloc type %x in lib '%s'\n", reloc_type, tpnt->libname);
 #endif
 				_dl_exit(1);
 			}
@@ -292,12 +362,12 @@ void _dl_perform_mips_global_got_relocations(struct elf_resolve *tpnt, int lazy)
 				}
 				else {
 					*got_entry = (unsigned long) _dl_find_hash(strtab +
-						sym->st_name, tpnt->symbol_scope, tpnt, ELF_RTYPE_CLASS_PLT);
+						sym->st_name, tpnt->symbol_scope, tpnt, ELF_RTYPE_CLASS_PLT, NULL);
 				}
 			}
 			else if (sym->st_shndx == SHN_COMMON) {
 				*got_entry = (unsigned long) _dl_find_hash(strtab +
-					sym->st_name, tpnt->symbol_scope, tpnt, ELF_RTYPE_CLASS_PLT);
+					sym->st_name, tpnt->symbol_scope, tpnt, ELF_RTYPE_CLASS_PLT, NULL);
 			}
 			else if (ELF_ST_TYPE(sym->st_info) == STT_FUNC &&
 				*got_entry != sym->st_value && tmp_lazy) {
@@ -308,8 +378,11 @@ void _dl_perform_mips_global_got_relocations(struct elf_resolve *tpnt, int lazy)
 					*got_entry += (unsigned long) tpnt->loadaddr;
 			}
 			else {
+				struct symbol_ref sym_ref;
+				sym_ref.sym = sym;
+				sym_ref.tpnt = NULL;
 				*got_entry = (unsigned long) _dl_find_hash(strtab +
-					sym->st_name, tpnt->symbol_scope, tpnt, ELF_RTYPE_CLASS_PLT);
+					sym->st_name, tpnt->symbol_scope, tpnt, ELF_RTYPE_CLASS_PLT, &sym_ref);
 			}
 
 			got_entry++;

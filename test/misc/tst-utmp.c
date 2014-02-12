@@ -19,6 +19,7 @@
    02111-1307 USA.  */
 
 #include <errno.h>
+#include <error.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/types.h>
@@ -49,13 +50,12 @@ static void do_prepare (int argc, char *argv[]);
 #define PREPARE do_prepare
 
 /* This defines the `main' function and some more.  */
-#include <test-skeleton.c>
+#include "../test-skeleton.c"
 
 
 /* These are for the temporary file we generate.  */
 char *name;
 int fd;
-static unsigned errors = 0;
 
 static void
 do_prepare (int argc, char *argv[])
@@ -70,10 +70,8 @@ do_prepare (int argc, char *argv[])
 
   /* Open our test file.  */
   fd = mkstemp (name);
-  if (fd == -1) {
-    printf ("cannot open test file `%s' (%d)", name, errno);
-    ++errors;
-  }
+  if (fd == -1)
+    error (EXIT_FAILURE, errno, "cannot open test file `%s'", name);
 }
 
 struct utmp entry[] =
@@ -113,8 +111,7 @@ do_init (void)
     {
       if (pututline (&entry[n]) == NULL)
 	{
-	  perror ("cannot write UTMP entry");
-	  ++errors;
+	  error (0, errno, "cannot write UTMP entry");
 	  return 1;
 	}
     }
@@ -139,8 +136,7 @@ do_check (void)
       if (n < num_entries &&
 	  memcmp (ut, &entry[n], sizeof (struct utmp)))
 	{
-	  printf ("UTMP entry does not match");
-	  ++errors;
+	  error (0, 0, "UTMP entry does not match");
 	  return 1;
 	}
 
@@ -149,8 +145,7 @@ do_check (void)
 
   if (n != num_entries)
     {
-      printf ("number of UTMP entries is incorrect");
-      ++errors;
+      error (0, 0, "number of UTMP entries is incorrect");
       return 1;
     }
 
@@ -182,8 +177,7 @@ simulate_login (const char *line, const char *user)
 
 	  if (pututline (&entry[n]) == NULL)
 	    {
-	      perror("cannot write UTMP entry");
-	      ++errors;
+	      error (0, errno, "cannot write UTMP entry");
 	      return 1;
 	    }
 
@@ -193,8 +187,7 @@ simulate_login (const char *line, const char *user)
 	}
     }
 
-  printf ("no entries available");
-  ++errors;
+  error (0, 0, "no entries available");
   return 1;
 }
 
@@ -218,8 +211,7 @@ simulate_logout (const char *line)
 
 	  if (pututline (&entry[n]) == NULL)
 	    {
-	      perror("cannot write UTMP entry");
-	      ++errors;
+	      error (0, errno, "cannot write UTMP entry");
 	      return 1;
 	    }
 
@@ -229,8 +221,7 @@ simulate_logout (const char *line)
 	}
     }
 
-  printf ("no entry found for `%s'", line);
-  ++errors;
+  error (0, 0, "no entry found for `%s'", line);
   return 1;
 }
 
@@ -247,8 +238,7 @@ check_login (const char *line)
   up = getutline (&ut);
   if (up == NULL)
     {
-      printf("cannot get entry for line `%s' (%d)", line, errno);
-      ++errors;
+      error (0, errno, "cannot get entry for line `%s'", line);
       return 1;
     }
 
@@ -260,8 +250,7 @@ check_login (const char *line)
 	{
 	  if (memcmp (up, &entry[n], sizeof (struct utmp)))
 	    {
-	      printf ("UTMP entry does not match");
-	      ++errors;
+	      error (0, 0, "UTMP entry does not match");
 	      return 1;
 	    }
 
@@ -269,8 +258,7 @@ check_login (const char *line)
 	}
     }
 
-  printf ("bogus entry for line `%s'", line);
-  ++errors;
+  error (0, 0, "bogus entry for line `%s'", line);
   return 1;
 }
 
@@ -284,8 +272,7 @@ check_logout (const char *line)
   strcpy (ut.ut_line, line);
   if (getutline (&ut) != NULL)
     {
-      printf ("bogus login entry for `%s'", line);
-      ++errors;
+      error (0, 0, "bogus login entry for `%s'", line);
       return 1;
     }
 
@@ -308,8 +295,7 @@ check_id (const char *id)
   up = getutid (&ut);
   if (up == NULL)
     {
-      printf ("cannot get entry for ID `%s' (%d)", id, errno);
-      ++errors;
+      error (0, errno, "cannot get entry for ID `%s'", id);
       return 1;
     }
 
@@ -321,8 +307,7 @@ check_id (const char *id)
 	{
 	  if (memcmp (up, &entry[n], sizeof (struct utmp)))
 	    {
-	      printf ("UTMP entry does not match");
-	      ++errors;
+	      error (0, 0, "UTMP entry does not match");
 	      return 1;
 	    }
 
@@ -330,8 +315,7 @@ check_id (const char *id)
 	}
     }
 
-  printf ("bogus entry for ID `%s'", id);
-  ++errors;
+  error (0, 0, "bogus entry for ID `%s'", id);
   return 1;
 }
 
@@ -348,8 +332,7 @@ check_type (int type)
   up = getutid (&ut);
   if (up == NULL)
     {
-      printf ("cannot get entry for type `%d' (%d)", type, errno);
-      ++errors;
+      error (0, errno, "cannot get entry for type `%d'", type);
       return 1;
     }
 
@@ -361,8 +344,7 @@ check_type (int type)
 	{
 	  if (memcmp (up, &entry[n], sizeof (struct utmp)))
 	    {
-	      printf ("UTMP entry does not match");
-	      ++errors;
+	      error (0, 0, "UTMP entry does not match");
 	      return 1;
 	    }
 
@@ -370,8 +352,7 @@ check_type (int type)
 	}
     }
 
-  printf ("bogus entry for type `%d'", type);
-  ++errors;
+  error (0, 0, "bogus entry for type `%d'", type);
   return 1;
 }
 

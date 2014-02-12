@@ -56,6 +56,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <assert.h>
 #include <errno.h>
 #include <netdb.h>
+#ifdef __UCLIBC_HAS_TLS__
+#include <tls.h>
+#endif
 #include <resolv.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -69,28 +72,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <sys/utsname.h>
 #include <net/if.h>
 #include <ifaddrs.h>
-
-/* Experimentally off - libc_hidden_proto(memcpy) */
-/* Experimentally off - libc_hidden_proto(memset) */
-/* libc_hidden_proto(strcmp) */
-/* libc_hidden_proto(stpcpy) */
-/* Experimentally off - libc_hidden_proto(strchr) */
-/* Experimentally off - libc_hidden_proto(strcpy) */
-/* Experimentally off - libc_hidden_proto(strlen) */
-libc_hidden_proto(socket)
-libc_hidden_proto(close)
-libc_hidden_proto(getservbyname_r)
-libc_hidden_proto(gethostbyname2_r)
-libc_hidden_proto(gethostbyaddr_r)
-libc_hidden_proto(inet_pton)
-libc_hidden_proto(inet_ntop)
-libc_hidden_proto(strtoul)
-libc_hidden_proto(if_nametoindex)
-libc_hidden_proto(__h_errno_location)
-/* libc_hidden_proto(uname) */
-#ifdef __UCLIBC_HAS_IPV6__
-libc_hidden_proto(in6addr_loopback)
-#endif
 
 #define GAIH_OKIFUNSPEC 0x0100
 #define GAIH_EAI        ~(GAIH_OKIFUNSPEC)
@@ -169,47 +150,51 @@ struct gaih {
 static unsigned __check_pf(void)
 {
 	unsigned seen = 0;
-#if defined __UCLIBC_SUPPORT_AI_ADDRCONFIG__
-	{
-		/* Get the interface list via getifaddrs.  */
-		struct ifaddrs *ifa = NULL;
-		struct ifaddrs *runp;
-		if (getifaddrs(&ifa) != 0) {
-			/* We cannot determine what interfaces are available.
-			 * Be optimistic.  */
-#if defined __UCLIBC_HAS_IPV4__
-			seen |= SEEN_IPV4;
-#endif /* __UCLIBC_HAS_IPV4__ */
-#if defined __UCLIBC_HAS_IPV6__
-			seen |= SEEN_IPV6;
-#endif /* __UCLIBC_HAS_IPV6__ */
-			return seen;
-		}
 
-		for (runp = ifa; runp != NULL; runp = runp->ifa_next) {
-			if (runp->ifa_addr == NULL)
-				continue;
+#if defined __UCLIBC_SUPPORT_AI_ADDRCONFIG__
+
+	struct ifaddrs *ifa;
+	struct ifaddrs *runp;
+
+	/* Get the interface list via getifaddrs.  */
+	if (getifaddrs(&ifa) != 0) {
+		/* We cannot determine what interfaces are available.
+		 * Be optimistic.  */
 #if defined __UCLIBC_HAS_IPV4__
-			if (runp->ifa_addr->sa_family == PF_INET)
-				seen |= SEEN_IPV4;
-#endif /* __UCLIBC_HAS_IPV4__ */
+		seen |= SEEN_IPV4;
+#endif
 #if defined __UCLIBC_HAS_IPV6__
-			if (runp->ifa_addr->sa_family == PF_INET6)
-				seen |= SEEN_IPV6;
-#endif /* __UCLIBC_HAS_IPV6__ */
-		}
-		freeifaddrs(ifa);
+		seen |= SEEN_IPV6;
+#endif
+		return seen;
 	}
+
+	for (runp = ifa; runp != NULL; runp = runp->ifa_next) {
+		if (runp->ifa_addr == NULL)
+			continue;
+#if defined __UCLIBC_HAS_IPV4__
+		if (runp->ifa_addr->sa_family == PF_INET)
+			seen |= SEEN_IPV4;
+#endif
+#if defined __UCLIBC_HAS_IPV6__
+		if (runp->ifa_addr->sa_family == PF_INET6)
+			seen |= SEEN_IPV6;
+#endif
+	}
+	freeifaddrs(ifa);
+
 #else
+
 	/* AI_ADDRCONFIG is disabled, assume both ipv4 and ipv6 available. */
 #if defined __UCLIBC_HAS_IPV4__
 	seen |= SEEN_IPV4;
-#endif /* __UCLIBC_HAS_IPV4__ */
+#endif
 #if defined __UCLIBC_HAS_IPV6__
 	seen |= SEEN_IPV6;
-#endif /* __UCLIBC_HAS_IPV6__ */
+#endif
 
 #endif /* __UCLIBC_SUPPORT_AI_ADDRCONFIG__ */
+
 	return seen;
 }
 
@@ -236,7 +221,7 @@ static int addrconfig(sa_family_t af)
 		ret = 1; /* Assume PF_UNIX. */
 		if (s < 0) {
 			if (errno != EMFILE)
-				ret = 0;
+	        		ret = 0;
 		} else
 			close(s);
 	}
@@ -266,52 +251,51 @@ gaih_local(const char *name, const struct gaih_service *service,
 		    strcmp(name, "unix") &&
 		    strcmp(name, utsname.nodename))
 			return (GAIH_OKIFUNSPEC | -EAI_NONAME);
+	}
+
+	if (req->ai_protocol || req->ai_socktype) {
+		const struct gaih_typeproto *tp = gaih_inet_typeproto + 1;
+
+		while (tp->name[0]
+		    && ((tp->protoflag & GAI_PROTO_NOSERVICE) != 0
+		       || (req->ai_socktype != 0 && req->ai_socktype != tp->socktype)
+		       || (req->ai_protocol != 0 && !(tp->protoflag & GAI_PROTO_PROTOANY) && req->ai_protocol != tp->protocol))
+		) {
+			++tp;
 		}
-
-		if (req->ai_protocol || req->ai_socktype) {
-			const struct gaih_typeproto *tp = gaih_inet_typeproto + 1;
-
-			while (tp->name[0]
-			    && ((tp->protoflag & GAI_PROTO_NOSERVICE) != 0
-			       || (req->ai_socktype != 0 && req->ai_socktype != tp->socktype)
-			       || (req->ai_protocol != 0 && !(tp->protoflag & GAI_PROTO_PROTOANY) && req->ai_protocol != tp->protocol))
-			) {
-				++tp;
-			}
-			if (! tp->name[0]) {
-				if (req->ai_socktype)
-					return (GAIH_OKIFUNSPEC | -EAI_SOCKTYPE);
-				return (GAIH_OKIFUNSPEC | -EAI_SERVICE);
-			}
+		if (! tp->name[0]) {
+			if (req->ai_socktype)
+				return (GAIH_OKIFUNSPEC | -EAI_SOCKTYPE);
+			return (GAIH_OKIFUNSPEC | -EAI_SERVICE);
 		}
+	}
 
-		*pai = ai = malloc(sizeof(struct addrinfo) + sizeof(struct sockaddr_un)
-				+ ((req->ai_flags & AI_CANONNAME)
-				? (strlen(utsname.nodename) + 1) : 0));
-		if (ai == NULL)
-			return -EAI_MEMORY;
+	*pai = ai = malloc(sizeof(struct addrinfo) + sizeof(struct sockaddr_un)
+			+ ((req->ai_flags & AI_CANONNAME)
+			? (strlen(utsname.nodename) + 1) : 0));
+	if (ai == NULL)
+		return -EAI_MEMORY;
 
-		ai->ai_next = NULL;
-		ai->ai_flags = req->ai_flags;
-		ai->ai_family = AF_LOCAL;
-		ai->ai_socktype = req->ai_socktype ? req->ai_socktype : SOCK_STREAM;
-		ai->ai_protocol = req->ai_protocol;
-		ai->ai_addrlen = sizeof(struct sockaddr_un);
-		ai->ai_addr = (void *)ai + sizeof(struct addrinfo);
+	ai->ai_next = NULL;
+	ai->ai_flags = req->ai_flags;
+	ai->ai_family = AF_LOCAL;
+	ai->ai_socktype = req->ai_socktype ? req->ai_socktype : SOCK_STREAM;
+	ai->ai_protocol = req->ai_protocol;
+	ai->ai_addrlen = sizeof(struct sockaddr_un);
+	ai->ai_addr = (void *)ai + sizeof(struct addrinfo);
 #if SALEN
-		((struct sockaddr_un *)ai->ai_addr)->sun_len = sizeof(struct sockaddr_un);
+	((struct sockaddr_un *)ai->ai_addr)->sun_len = sizeof(struct sockaddr_un);
 #endif /* SALEN */
 
-		((struct sockaddr_un *)ai->ai_addr)->sun_family = AF_LOCAL;
-		memset(((struct sockaddr_un *)ai->ai_addr)->sun_path, 0, UNIX_PATH_MAX);
+	((struct sockaddr_un *)ai->ai_addr)->sun_family = AF_LOCAL;
+	memset(((struct sockaddr_un *)ai->ai_addr)->sun_path, 0, UNIX_PATH_MAX);
 
-		if (service) {
-			struct sockaddr_un *sunp = (struct sockaddr_un *)ai->ai_addr;
+	if (service) {
+		struct sockaddr_un *sunp = (struct sockaddr_un *)ai->ai_addr;
 
-			if (strchr(service->name, '/') != NULL) {
-				if (strlen(service->name) >= sizeof(sunp->sun_path))
-					return GAIH_OKIFUNSPEC | -EAI_SERVICE;
-
+		if (strchr(service->name, '/') != NULL) {
+			if (strlen(service->name) >= sizeof(sunp->sun_path))
+				return GAIH_OKIFUNSPEC | -EAI_SERVICE;
 			strcpy(sunp->sun_path, service->name);
 		} else {
 			if (strlen(P_tmpdir "/") + 1 + strlen(service->name) >= sizeof(sunp->sun_path))
@@ -326,7 +310,7 @@ gaih_local(const char *name, const struct gaih_service *service,
 		char *buf = ((struct sockaddr_un *)ai->ai_addr)->sun_path;
 
 		if (__path_search(buf, L_tmpnam, NULL, NULL, 0) != 0
-		 || __gen_tempname(buf, __GT_NOCREATE) != 0
+		 || __gen_tempname(buf, __GT_NOCREATE, 0) != 0
 		) {
 			return -EAI_SYSTEM;
 		}
@@ -411,9 +395,9 @@ gaih_inet(const char *name, const struct gaih_service *service,
 {
 	struct gaih_servtuple nullserv;
 
-	const struct gaih_typeproto *tp = gaih_inet_typeproto;
-	struct gaih_servtuple *st = &nullserv;
-	struct gaih_addrtuple *at = NULL;
+	const struct gaih_typeproto *tp;
+	struct gaih_servtuple *st;
+	struct gaih_addrtuple *at;
 	int rc;
 	int v4mapped = (req->ai_family == PF_UNSPEC || req->ai_family == PF_INET6)
 			&& (req->ai_flags & AI_V4MAPPED);
@@ -421,22 +405,24 @@ gaih_inet(const char *name, const struct gaih_service *service,
 
 	memset(&nullserv, 0, sizeof(nullserv));
 
+	tp = gaih_inet_typeproto;
 	if (req->ai_protocol || req->ai_socktype) {
 		++tp;
-		while (tp->name[0]
-			&& ((req->ai_socktype != 0 && req->ai_socktype != tp->socktype)
-			    || (req->ai_protocol != 0 && !(tp->protoflag & GAI_PROTO_PROTOANY) && req->ai_protocol != tp->protocol)
-			)
-		) {
+		while (tp->name[0]) {
+			if ((req->ai_socktype == 0 || req->ai_socktype == tp->socktype)
+			 && (req->ai_protocol == 0 || req->ai_protocol == tp->protocol || (tp->protoflag & GAI_PROTO_PROTOANY))
+			) {
+				goto found;
+			}
 			++tp;
 		}
-		if (! tp->name[0]) {
-			if (req->ai_socktype)
-				return (GAIH_OKIFUNSPEC | -EAI_SOCKTYPE);
-			return (GAIH_OKIFUNSPEC | -EAI_SERVICE);
-		}
+		if (req->ai_socktype)
+			return (GAIH_OKIFUNSPEC | -EAI_SOCKTYPE);
+		return (GAIH_OKIFUNSPEC | -EAI_SERVICE);
+ found: ;
 	}
 
+	st = &nullserv;
 	if (service != NULL) {
 		if ((tp->protoflag & GAI_PROTO_NOSERVICE) != 0)
 			return (GAIH_OKIFUNSPEC | -EAI_SERVICE);
@@ -511,6 +497,7 @@ gaih_inet(const char *name, const struct gaih_service *service,
 		}
 	}
 
+	at = NULL;
 	if (name != NULL) {
 		at = alloca(sizeof(struct gaih_addrtuple));
 		at->family = AF_UNSPEC;
@@ -518,10 +505,9 @@ gaih_inet(const char *name, const struct gaih_service *service,
 		at->next = NULL;
 
 		if (inet_pton(AF_INET, name, at->addr) > 0) {
-			if (req->ai_family == AF_UNSPEC || req->ai_family == AF_INET || v4mapped)
-				at->family = AF_INET;
-			else
+			if (req->ai_family != AF_UNSPEC && req->ai_family != AF_INET && !v4mapped)
 				return -EAI_FAMILY;
+			at->family = AF_INET;
 		}
 
 #if defined __UCLIBC_HAS_IPV6__
@@ -534,14 +520,13 @@ gaih_inet(const char *name, const struct gaih_service *service,
 				*scope_delim = '\0';
 
 			if (inet_pton(AF_INET6, namebuf, at->addr) > 0) {
-				if (req->ai_family == AF_UNSPEC || req->ai_family == AF_INET6)
-					at->family = AF_INET6;
-				else
+				if (req->ai_family != AF_UNSPEC && req->ai_family != AF_INET6)
 					return -EAI_FAMILY;
-
+				at->family = AF_INET6;
 				if (scope_delim != NULL) {
 					int try_numericscope = 0;
-					if (IN6_IS_ADDR_LINKLOCAL(at->addr) || IN6_IS_ADDR_MC_LINKLOCAL(at->addr)) {
+					uint32_t *a32 = (uint32_t*)at->addr;
+					if (IN6_IS_ADDR_LINKLOCAL(a32) || IN6_IS_ADDR_MC_LINKLOCAL(at->addr)) {
 						at->scopeid = if_nametoindex(scope_delim + 1);
 						if (at->scopeid == 0)
 							try_numericscope = 1;
@@ -560,7 +545,7 @@ gaih_inet(const char *name, const struct gaih_service *service,
 		}
 #endif
 
-		if (at->family == AF_UNSPEC && (req->ai_flags & AI_NUMERICHOST) == 0) {
+		if (at->family == AF_UNSPEC && !(req->ai_flags & AI_NUMERICHOST)) {
 			struct hostent *h;
 			struct gaih_addrtuple **pat = &at;
 			int no_data = 0;
@@ -619,8 +604,10 @@ gaih_inet(const char *name, const struct gaih_service *service,
 #endif
 		if (req->ai_family == 0 || req->ai_family == AF_INET) {
 			atr->family = AF_INET;
-			if ((req->ai_flags & AI_PASSIVE) == 0)
-				*(uint32_t*)atr->addr = htonl(INADDR_LOOPBACK);
+			if ((req->ai_flags & AI_PASSIVE) == 0) {
+				uint32_t *a = (uint32_t*)atr->addr;
+				*a = htonl(INADDR_LOOPBACK);
+			}
 		}
 	}
 
@@ -651,16 +638,18 @@ gaih_inet(const char *name, const struct gaih_service *service,
 				do {
 					tmpbuflen *= 2;
 					tmpbuf = alloca(tmpbuflen);
-					//if (tmpbuf == NULL)
-					//	return -EAI_MEMORY;
 					rc = gethostbyaddr_r(at2->addr,
+#ifdef __UCLIBC_HAS_IPV6__
 						((at2->family == AF_INET6)
 						 ? sizeof(struct in6_addr)
 						 : sizeof(struct in_addr)),
+#else
+						sizeof(struct in_addr),
+#endif
 						at2->family,
 						&th, tmpbuf, tmpbuflen,
 						&h, &herrno);
-				} while (rc == errno && herrno == NETDB_INTERNAL);
+				} while (rc == ERANGE && herrno == NETDB_INTERNAL);
 
 				if (rc != 0 && herrno == NETDB_INTERNAL) {
 					__set_h_errno(herrno);
@@ -715,7 +704,7 @@ gaih_inet(const char *name, const struct gaih_service *service,
 				(*pai)->ai_addr = (void *) (*pai) + sizeof(struct addrinfo);
 #if defined SALEN
 				(*pai)->ai_addr->sa_len = socklen;
-#endif /* SALEN */
+#endif
 				(*pai)->ai_addr->sa_family = family;
 
 #if defined __UCLIBC_HAS_IPV6__
@@ -777,7 +766,6 @@ static const struct gaih gaih[] = {
 	{ PF_UNSPEC, NULL }
 };
 
-libc_hidden_proto(freeaddrinfo)
 void
 freeaddrinfo(struct addrinfo *ai)
 {
@@ -791,14 +779,13 @@ freeaddrinfo(struct addrinfo *ai)
 }
 libc_hidden_def(freeaddrinfo)
 
-libc_hidden_proto(getaddrinfo)
 int
 getaddrinfo(const char *name, const char *service,
 	     const struct addrinfo *hints, struct addrinfo **pai)
 {
-	int i = 0, j, last_i = 0;
-	struct addrinfo *p = NULL, **end;
-	const struct gaih *g = gaih, *pg = NULL;
+	int i, j, last_i;
+	struct addrinfo *p, **end;
+	const struct gaih *g, *pg;
 	struct gaih_service gaih_service, *pservice;
 	struct addrinfo default_hints;
 
@@ -813,7 +800,7 @@ getaddrinfo(const char *name, const char *service,
 
 	if (hints == NULL) {
 		memset(&default_hints, 0, sizeof(default_hints));
-		if (AF_UNSPEC)
+		if (AF_UNSPEC != 0)
 			default_hints.ai_family = AF_UNSPEC;
 		hints = &default_hints;
 	}
@@ -845,10 +832,14 @@ getaddrinfo(const char *name, const char *service,
 	} else
 		pservice = NULL;
 
+	g = gaih;
+	pg = NULL;
+	p = NULL;
 	end = NULL;
 	if (pai)
 		end = &p;
-
+	i = 0;
+	last_i = 0;
 	j = 0;
 	while (g->gaih) {
 		if (hints->ai_family == g->family || hints->ai_family == AF_UNSPEC) {
@@ -864,7 +855,7 @@ getaddrinfo(const char *name, const char *service,
 					last_i = i;
 					if (hints->ai_family == AF_UNSPEC && (i & GAIH_OKIFUNSPEC))
 						continue;
-					if (p)
+					/*if (p) - freeaddrinfo works ok on NULL too */
 						freeaddrinfo(p);
 					return -(i & GAIH_EAI);
 				}

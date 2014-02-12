@@ -8,7 +8,6 @@
 #include "_string.h"
 
 #ifdef __USE_GNU
-/* Experimentally off - libc_hidden_proto(memmem) */
 void *memmem(const void *haystack, size_t haystacklen,
 		     const void *needle, size_t needlelen)
 {
@@ -38,5 +37,4 @@ void *memmem(const void *haystack, size_t haystacklen,
 
 	return NULL;
 }
-libc_hidden_def(memmem)
 #endif

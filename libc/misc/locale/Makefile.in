@@ -5,6 +5,8 @@
 # Licensed under the LGPL v2.1, see the file COPYING.LIB in this tarball.
 #
 
+subdirs += libc/misc/locale
+
 # multi source locale.c
 CSRC := setlocale.c localeconv.c _locale_init.c nl_langinfo.c
 ifeq ($(UCLIBC_HAS_LOCALE),y)
@@ -22,7 +24,7 @@ MISC_LOCALE_OBJ := $(patsubst %.c,$(MISC_LOCALE_OUT)/%.o,$(CSRC))
 
 libc-y += $(MISC_LOCALE_OBJ)
 
-objclean-y += misc_locale_clean
+objclean-y += CLEAN_libc/misc/locale
 
-misc_locale_clean:
+CLEAN_libc/misc/locale:
 	$(do_rm) $(addprefix $(MISC_LOCALE_OUT)/*., o os)

@@ -44,6 +44,7 @@
 #define	_PATH_DEVDB	"/var/run/dev.db"
 #define	_PATH_DEVNULL	"/dev/null"
 #define	_PATH_DRUM	"/dev/drum"
+#define	_PATH_GSHADOW	"/etc/gshadow"
 #define	_PATH_KLOG	"/proc/kmsg"
 #define	_PATH_KMEM	"/dev/kmem"
 #define	_PATH_LASTLOG	"/var/log/lastlog"
@@ -64,7 +65,6 @@
 #define	_PATH_VI	"/usr/bin/vi"
 #define _PATH_WTMP	"/var/log/wtmp"
 
-/* uClibc */
 #ifdef _LIBC
 #define _PATH_PASSWD	"/etc/passwd"
 #define _PATH_GROUP	"/etc/group"

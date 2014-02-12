@@ -22,10 +22,19 @@
 #include <bits/errno.h>
 #include <sys/syscall.h>
 
+#if defined __NR_fadvise64_64 || defined __NR_fadvise64
+
+/* Was named __libc_posix_fadvise64 for some inexplicable reason.
+** google says only uclibc has *__libc*_posix_fadviseXXX,
+** so it cannot be compat with anything.
+**
+** Remove this comment and one at the end after 0.9.31
+*/
+
 .text
-.global __libc_posix_fadvise64
-.type   __libc_posix_fadvise64,%function
-__libc_posix_fadvise64:
+.global posix_fadvise64
+.type   posix_fadvise64,%function
+posix_fadvise64:
 #if defined __NR_fadvise64_64
 	/* Save regs  */
 	pushl	%ebp
@@ -83,18 +92,18 @@ overflow:
 
 	/* Returns 0 on success, else an error code.  */
 	negl	%eax
-
-#elif defined __UCLIBC_HAS_STUBS__
-	movl	$-ENOSYS, %eax
-	jmp __syscall_error
 #endif
+
 	/* Successful; return the syscall's value.  */
 	ret
 
-.size __libc_posix_fadvise64,.-__libc_posix_fadvise64
+.size posix_fadvise64,.-posix_fadvise64
 
-libc_hidden_def(__libc_posix_fadvise64)
-#if defined __UCLIBC_HAS_LFS__ && defined __UCLIBC_HAS_ADVANCED_REALTIME__
-weak_alias(__libc_posix_fadvise64,posix_fadvise64)
+/*
+** libc_hidden_def(__libc_posix_fadvise64)
+** #if defined __UCLIBC_HAS_LFS__ && defined __UCLIBC_HAS_ADVANCED_REALTIME__
+** weak_alias(__libc_posix_fadvise64,posix_fadvise64)
+** #endif
+*/
+
 #endif
-

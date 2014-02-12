@@ -29,12 +29,12 @@
 
 /* take care of optional things ... */
 #define STUB(func, args) static void func args { sleep(0); }
-#if !defined(__UCLIBC__) || defined(__UCLIBC_AIO__)
+#if defined(__UCLIBC_AIO__)
 # include <aio.h>
 #else
 STUB(aio_suspend, (void *p, int n, const void *p2))
 #endif
-#if !defined(__UCLIBC__) || defined(__UCLIBC_STROPTS__)
+#if defined(__UCLIBC_STROPTS__)
 # include <stropts.h>
 #else
 STUB(getmsg, (int f, void *p, void *p2, void *p3))
@@ -149,7 +149,9 @@ MAKE_CANCEL_THREAD_FUNC(sigwaitinfo, (NULL, NULL))
 MAKE_CANCEL_THREAD_FUNC(sleep, (0))
 MAKE_CANCEL_THREAD_FUNC(system, (""))
 MAKE_CANCEL_THREAD_FUNC(tcdrain, (-1))
+#ifdef __UCLIBC_SUSV3_LEGACY__
 MAKE_CANCEL_THREAD_FUNC(usleep, (0))
+#endif
 MAKE_CANCEL_THREAD_FUNC(wait, (NULL))
 MAKE_CANCEL_THREAD_FUNC(waitid, (0, 0, NULL, 0))
 MAKE_CANCEL_THREAD_FUNC(waitpid, (-1, NULL, 0))
@@ -264,7 +266,9 @@ int main(int argc, char *argv[])
 	ret += TEST_FUNC(sleep);
 	ret += TEST_FUNC(system);
 	ret += TEST_FUNC(tcdrain);
+#ifdef __UCLIBC_SUSV3_LEGACY__
 	ret += TEST_FUNC(usleep);
+#endif
 	ret += TEST_FUNC(wait);
 	ret += TEST_FUNC(waitid);
 	ret += TEST_FUNC(waitpid);

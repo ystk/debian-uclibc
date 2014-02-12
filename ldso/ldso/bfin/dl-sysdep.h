@@ -56,6 +56,9 @@ USA.  */
 /* Used for error messages */
 #define ELF_TARGET "BFIN"
 
+/* Need bootstrap relocations */
+#define ARCH_NEEDS_BOOTSTRAP_RELOCS
+
 struct elf_resolve;
 
 struct funcdesc_value
@@ -117,6 +120,8 @@ struct funcdesc_ht;
 #define DL_INIT_LOADADDR_HDR(LOADADDR, ADDR, PHDR) \
   (__dl_init_loadaddr_hdr ((LOADADDR), (ADDR), (PHDR), \
 			   dl_init_loadaddr_load_count))
+#define DL_UPDATE_LOADADDR_HDR(LOADADDR, ADDR, PHDR) \
+  (__dl_update_loadaddr_hdr ((LOADADDR), (ADDR), (PHDR)))
 #define DL_LOADADDR_UNMAP(LOADADDR, LEN) \
   (__dl_loadaddr_unmap ((LOADADDR), (NULL)))
 #define DL_LIB_UNMAP(LIB, LEN) \

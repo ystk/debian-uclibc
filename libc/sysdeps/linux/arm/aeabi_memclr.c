@@ -18,12 +18,11 @@
 
 #include <string.h>
 
-/* Experimentally off - libc_hidden_proto(memset) */
 
 /* Clear memory.  Can't alias to bzero because it's not defined in the
    same translation unit.  */
-void
-__aeabi_memclr (void *dest, size_t n)
+void __aeabi_memclr (void *dest, size_t n);
+void __aeabi_memclr (void *dest, size_t n)
 {
   memset (dest, 0, n);
 }

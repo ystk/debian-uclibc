@@ -12,17 +12,12 @@
 #include <sys/utsname.h>
 
 #if defined __USE_BSD || (defined __USE_XOPEN && !defined __USE_UNIX98)
-/* Experimentally off - libc_hidden_proto(strlen) */
-/* Experimentally off - libc_hidden_proto(strcpy) */
-libc_hidden_proto(uname)
 
-#if !defined __UCLIBC_BSD_SPECIFIC__
-extern int getdomainname (char *__name, size_t __len)
-	__THROW __nonnull ((1)) __wur;
+int
+#ifndef __UCLIBC_BSD_SPECIFIC__
+attribute_hidden
 #endif
-extern __typeof(getdomainname) __libc_getdomainname;
-libc_hidden_proto(__libc_getdomainname)
-int __libc_getdomainname(char *name, size_t len)
+getdomainname(char *name, size_t len)
 {
   struct utsname uts;
 
@@ -48,10 +43,7 @@ int __libc_getdomainname(char *name, size_t len)
 #endif
   return 0;
 }
-libc_hidden_def(__libc_getdomainname)
-#if defined __UCLIBC_BSD_SPECIFIC__
-libc_hidden_proto(getdomainname)
-weak_alias(__libc_getdomainname,getdomainname)
-libc_hidden_weak(getdomainname)
-#endif /* __UCLIBC_BSD_SPECIFIC__ */
+# ifdef __UCLIBC_BSD_SPECIFIC__
+libc_hidden_def(getdomainname)
+# endif
 #endif

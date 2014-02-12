@@ -12,12 +12,9 @@ config FORCE_OPTIONS_FOR_ARCH
 	default y
 	select ARCH_ANY_ENDIAN
 
-config ARCH_CFLAGS
-	string
-
 choice
 	prompt "Target ABI"
-	default CONFIG_ARM_OABI
+	default CONFIG_ARM_EABI
 	help
 	  If you choose "EABI" here, functions and constants required by the
 	  ARM EABI will be built into the library.  You should choose "EABI"

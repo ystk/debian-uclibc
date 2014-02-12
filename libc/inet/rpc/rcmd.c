@@ -69,7 +69,6 @@ static char sccsid[] = "@(#)rcmd.c	8.3 (Berkeley) 3/26/94";
 #include <netinet/in.h>
 #include <arpa/inet.h>
 
-#include <alloca.h>
 #include <signal.h>
 #include <fcntl.h>
 #include <netdb.h>
@@ -86,60 +85,8 @@ static char sccsid[] = "@(#)rcmd.c	8.3 (Berkeley) 3/26/94";
 #include <wchar.h>
 #endif
 #include <sys/uio.h>
+#include <bits/uClibc_alloc.h>
 
-/* Experimentally off - libc_hidden_proto(memcmp) */
-/* Experimentally off - libc_hidden_proto(strcat) */
-/* Experimentally off - libc_hidden_proto(strchr) */
-/* Experimentally off - libc_hidden_proto(strcmp) */
-/* Experimentally off - libc_hidden_proto(strcpy) */
-/* Experimentally off - libc_hidden_proto(strlen) */
-/* Experimentally off - libc_hidden_proto(strncmp) */
-/* Experimentally off - libc_hidden_proto(memmove) */
-libc_hidden_proto(getpid)
-libc_hidden_proto(socket)
-libc_hidden_proto(close)
-libc_hidden_proto(fcntl)
-libc_hidden_proto(read)
-libc_hidden_proto(write)
-libc_hidden_proto(perror)
-libc_hidden_proto(lstat)
-libc_hidden_proto(fstat)
-libc_hidden_proto(tolower)
-libc_hidden_proto(sysconf)
-libc_hidden_proto(getline)
-libc_hidden_proto(geteuid)
-libc_hidden_proto(seteuid)
-libc_hidden_proto(getpwnam_r)
-libc_hidden_proto(gethostbyname)
-libc_hidden_proto(gethostbyname_r)
-libc_hidden_proto(fileno)
-libc_hidden_proto(sleep)
-libc_hidden_proto(inet_addr)
-libc_hidden_proto(inet_ntoa)
-libc_hidden_proto(herror)
-libc_hidden_proto(bind)
-libc_hidden_proto(connect)
-libc_hidden_proto(sigblock)
-libc_hidden_proto(snprintf)
-libc_hidden_proto(poll)
-libc_hidden_proto(accept)
-libc_hidden_proto(listen)
-libc_hidden_proto(sigsetmask)
-libc_hidden_proto(getc_unlocked)
-libc_hidden_proto(__fgetc_unlocked)
-libc_hidden_proto(fopen)
-libc_hidden_proto(fclose)
-libc_hidden_proto(fprintf)
-libc_hidden_proto(__h_errno_location)
-#ifdef __UCLIBC_HAS_XLOCALE__
-libc_hidden_proto(__ctype_b_loc)
-libc_hidden_proto(__ctype_tolower_loc)
-#elif defined __UCLIBC_HAS_CTYPE_TABLES__
-libc_hidden_proto(__ctype_b)
-libc_hidden_proto(__ctype_tolower)
-#endif
-
-libc_hidden_proto(rresvport)
 
 /* some forward declarations */
 static int __ivaliduser2(FILE *hostf, u_int32_t raddr,
@@ -148,11 +95,8 @@ static int iruserok2 (u_int32_t raddr, int superuser, const char *ruser,
 		      const char *luser, const char *rhost);
 
 
-int rcmd(ahost, rport, locuser, remuser, cmd, fd2p)
-     char **ahost;
-     u_short rport;
-     const char *locuser, *remuser, *cmd;
-     int *fd2p;
+int rcmd(char **ahost, u_short rport, const char *locuser, const char *remuser,
+		 const char *cmd, int *fd2p)
 {
 #ifdef __UCLIBC_HAS_REENTRANT_RPC__
 	int herr;
@@ -172,11 +116,7 @@ int rcmd(ahost, rport, locuser, remuser, cmd, fd2p)
 
 #ifdef __UCLIBC_HAS_REENTRANT_RPC__
 	hstbuflen = 1024;
-#ifdef __ARCH_USE_MMU__
-	tmphstbuf = alloca (hstbuflen);
-#else
-	tmphstbuf = malloc (hstbuflen);
-#endif
+	tmphstbuf = stack_heap_alloc(hstbuflen);
 
 	while (gethostbyname_r (*ahost, &hostbuf, tmphstbuf,
 		    hstbuflen, &hp, &herr) != 0 || hp == NULL)
@@ -184,9 +124,7 @@ int rcmd(ahost, rport, locuser, remuser, cmd, fd2p)
 	    if (herr != NETDB_INTERNAL || errno != ERANGE)
 	    {
 		__set_h_errno (herr);
-#ifndef __ARCH_USE_MMU__
-		free(tmphstbuf);
-#endif
+		stack_heap_free(tmphstbuf);
 		herror(*ahost);
 		return -1;
 	    }
@@ -194,17 +132,11 @@ int rcmd(ahost, rport, locuser, remuser, cmd, fd2p)
 	    {
 		/* Enlarge the buffer.  */
 		hstbuflen *= 2;
-#ifdef __ARCH_USE_MMU__
-		tmphstbuf = alloca (hstbuflen);
-#else
-		free(tmphstbuf);
-		tmphstbuf = malloc (hstbuflen);
-#endif
+		stack_heap_free(tmphstbuf);
+		tmphstbuf = stack_heap_alloc(hstbuflen);
 	    }
 	}
-#ifndef __ARCH_USE_MMU__
-	free(tmphstbuf);
-#endif
+	stack_heap_free(tmphstbuf);
 #else /* call the non-reentrant version */
 	if ((hp = gethostbyname(*ahost)) == NULL) {
 	    return -1;
@@ -372,9 +304,8 @@ libc_hidden_def(rresvport)
  */
 int  __check_rhosts_file = 1;
 
-int ruserok(rhost, superuser, ruser, luser)
-	const char *rhost, *ruser, *luser;
-	int superuser;
+int ruserok(const char *rhost, int superuser, const char *ruser,
+			const char *luser)
 {
         struct hostent *hp;
 	u_int32_t addr;
@@ -388,35 +319,23 @@ int ruserok(rhost, superuser, ruser, luser)
 
 #ifdef __UCLIBC_HAS_REENTRANT_RPC__
 	buflen = 1024;
-#ifdef __ARCH_USE_MMU__
-	buffer = alloca (buflen);
-#else
-	buffer = malloc (buflen);
-#endif
+	buffer = stack_heap_alloc(buflen);
 
 	while (gethostbyname_r (rhost, &hostbuf, buffer,
 		    buflen, &hp, &herr) != 0 || hp == NULL)
 	{
 	    if (herr != NETDB_INTERNAL || errno != ERANGE) {
-#ifndef __ARCH_USE_MMU__
-		free(buffer);
-#endif
+		stack_heap_free(buffer);
 		return -1;
 	    } else
 	    {
 		/* Enlarge the buffer.  */
 		buflen *= 2;
-#ifdef __ARCH_USE_MMU__
-		buffer = alloca (buflen);
-#else
-		free(buffer);
-		buffer = malloc (buflen);
-#endif
+		stack_heap_free(buffer);
+		buffer = stack_heap_alloc(buflen);
 	    }
 	}
-#ifndef __ARCH_USE_MMU__
-	free(buffer);
-#endif
+	stack_heap_free(buffer);
 #else
 	if ((hp = gethostbyname(rhost)) == NULL) {
 		return -1;
@@ -483,10 +402,8 @@ iruserfopen (const char *file, uid_t okuser)
  * Returns 0 if ok, -1 if not ok.
  */
 static int
-iruserok2 (raddr, superuser, ruser, luser, rhost)
-     u_int32_t raddr;
-     int superuser;
-     const char *ruser, *luser, *rhost;
+iruserok2 (u_int32_t raddr, int superuser, const char *ruser, const char *luser,
+		   const char *rhost)
 {
 	FILE *hostf = NULL;
 	int isbad = -1;
@@ -511,23 +428,15 @@ iruserok2 (raddr, superuser, ruser, luser, rhost)
 #ifdef __UCLIBC_HAS_REENTRANT_RPC__
 		size_t buflen = sysconf (_SC_GETPW_R_SIZE_MAX);
 		struct passwd pwdbuf;
-#ifdef __ARCH_USE_MMU__
-		char *buffer = alloca (buflen);
-#else
-		char *buffer = malloc (buflen);
-#endif
+		char *buffer = stack_heap_alloc(buflen);
 
 		if (getpwnam_r (luser, &pwdbuf, buffer,
 			    buflen, &pwd) != 0 || pwd == NULL)
 		{
-#ifndef __ARCH_USE_MMU__
-			free(buffer);
-#endif
+			stack_heap_free(buffer);
 			return -1;
 		}
-#ifndef __ARCH_USE_MMU__
-		free(buffer);
-#endif
+		stack_heap_free(buffer);
 #else
 		if ((pwd = getpwnam(luser)) == NULL)
 			return -1;
@@ -700,10 +609,8 @@ __isempty(char *p)
  * Returns 0 if positive match, -1 if _not_ ok.
  */
 static int
-__ivaliduser2(hostf, raddr, luser, ruser, rhost)
-	FILE *hostf;
-	u_int32_t raddr;
-	const char *luser, *ruser, *rhost;
+__ivaliduser2(FILE *hostf, u_int32_t raddr,	const char *luser,
+			  const char *ruser, const char *rhost)
 {
     register const char *user;
     register char *p;

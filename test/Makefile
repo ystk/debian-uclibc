@@ -26,13 +26,16 @@ endif
 ifneq ($(UCLIBC_HAS_REGEX),y)
 	DIRS := $(filter-out regex,$(DIRS))
 endif
+ifneq ($(UCLIBC_HAS_THREADS_NATIVE),y)
+	DIRS := $(filter-out tls nptl,$(DIRS))
+endif
 ifneq ($(UCLIBC_HAS_WCHAR),y)
 	DIRS := $(filter-out locale-mbwc,$(DIRS))
 endif
 ifneq ($(UCLIBC_HAS_LOCALE),y)
 	DIRS := $(filter-out locale,$(DIRS))
 endif
-ifeq ($(UCLIBC_HAS_CRYPT_STUB),y)
+ifneq ($(UCLIBC_HAS_CRYPT),y)
 	DIRS := $(filter-out crypt,$(DIRS))
 endif
 ifeq ($(HAS_NO_THREADS),y)
@@ -41,9 +44,12 @@ endif
 
 test check all: run
 
-run: subdirs_run
+run: compile subdirs_run
 
-compile: subdirs_compile
+compile: $(top_builddir)/$(LOCAL_INSTALL_PATH) subdirs_compile
+
+$(top_builddir)/$(LOCAL_INSTALL_PATH):
+	$(Q)$(MAKE) -C $(top_builddir) $(LOCAL_INSTALL_PATH)
 
 tags:
 	ctags -R

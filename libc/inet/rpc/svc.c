@@ -41,21 +41,14 @@
 
 #include <errno.h>
 #include <unistd.h>
+#include <string.h>
 #include "rpc_private.h"
 #include <rpc/svc.h>
 #include <rpc/pmap_clnt.h>
 #include <sys/poll.h>
 
-/* Experimentally off - libc_hidden_proto(ffs) */
-libc_hidden_proto(pmap_set)
-libc_hidden_proto(pmap_unset)
-libc_hidden_proto(_authenticate)
-libc_hidden_proto(_rpc_dtablesize)
 /* used by svc_[max_]pollfd */
-libc_hidden_proto(__rpc_thread_svc_pollfd)
-libc_hidden_proto(__rpc_thread_svc_max_pollfd)
 /* used by svc_fdset */
-libc_hidden_proto(__rpc_thread_svc_fdset)
 
 #ifdef __UCLIBC_HAS_THREADS__
 #define xports (*(SVCXPRT ***)&RPC_THREAD_VARIABLE(svc_xports_s))
@@ -85,7 +78,6 @@ static struct svc_callout *svc_head;
 /* ***************  SVCXPRT related stuff **************** */
 
 /* Activate a transport handle. */
-libc_hidden_proto(xprt_register)
 void
 xprt_register (SVCXPRT *xprt)
 {
@@ -129,7 +121,6 @@ xprt_register (SVCXPRT *xprt)
 libc_hidden_def(xprt_register)
 
 /* De-activate a transport handle. */
-libc_hidden_proto(xprt_unregister)
 void
 xprt_unregister (SVCXPRT *xprt)
 {
@@ -175,7 +166,6 @@ done:
 /* Add a service program to the callout list.
    The dispatch routine will be called when a rpc request for this
    program number comes in. */
-libc_hidden_proto(svc_register)
 bool_t
 svc_register (SVCXPRT * xprt, rpcprog_t prog, rpcvers_t vers,
 	      void (*dispatch) (struct svc_req *, SVCXPRT *),
@@ -210,7 +200,6 @@ pmap_it:
 libc_hidden_def(svc_register)
 
 /* Remove a service program from the callout list. */
-libc_hidden_proto(svc_unregister)
 void
 svc_unregister (rpcprog_t prog, rpcvers_t vers)
 {
@@ -235,7 +224,6 @@ libc_hidden_def(svc_unregister)
 /* ******************* REPLY GENERATION ROUTINES  ************ */
 
 /* Send a reply to an rpc request */
-libc_hidden_proto(svc_sendreply)
 bool_t
 svc_sendreply (register SVCXPRT *xprt, xdrproc_t xdr_results,
 	       caddr_t xdr_location)
@@ -266,7 +254,6 @@ svcerr_noproc (register SVCXPRT *xprt)
 }
 
 /* Can't decode args error reply */
-libc_hidden_proto(svcerr_decode)
 void
 svcerr_decode (register SVCXPRT *xprt)
 {
@@ -294,7 +281,6 @@ svcerr_systemerr (register SVCXPRT *xprt)
 }
 
 /* Authentication error reply */
-libc_hidden_proto(svcerr_auth)
 void
 svcerr_auth (SVCXPRT *xprt, enum auth_stat why)
 {
@@ -316,7 +302,6 @@ svcerr_weakauth (SVCXPRT *xprt)
 }
 
 /* Program unavailable error reply */
-libc_hidden_proto(svcerr_noprog)
 void
 svcerr_noprog (register SVCXPRT *xprt)
 {
@@ -331,7 +316,6 @@ svcerr_noprog (register SVCXPRT *xprt)
 libc_hidden_def(svcerr_noprog)
 
 /* Program version mismatch error reply */
-libc_hidden_proto(svcerr_progvers)
 void
 svcerr_progvers (register SVCXPRT *xprt, rpcvers_t low_vers,
 		 rpcvers_t high_vers)
@@ -366,7 +350,6 @@ libc_hidden_def(svcerr_progvers)
  * is mallocated in kernel land.
  */
 
-libc_hidden_proto(svc_getreq_common)
 void
 svc_getreq_common (const int fd)
 {
@@ -458,7 +441,6 @@ svc_getreq_common (const int fd)
 }
 libc_hidden_def(svc_getreq_common)
 
-libc_hidden_proto(svc_getreqset)
 void
 svc_getreqset (fd_set *readfds)
 {
@@ -476,7 +458,6 @@ svc_getreqset (fd_set *readfds)
 }
 libc_hidden_def(svc_getreqset)
 
-libc_hidden_proto(svc_getreq)
 void
 svc_getreq (int rdfds)
 {
@@ -488,7 +469,6 @@ svc_getreq (int rdfds)
 }
 libc_hidden_def(svc_getreq)
 
-libc_hidden_proto(svc_getreq_poll)
 void
 svc_getreq_poll (struct pollfd *pfdp, int pollretval)
 {

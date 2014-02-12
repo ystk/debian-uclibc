@@ -5,12 +5,9 @@
  * Licensed under the LGPL v2.1, see the file COPYING.LIB in this tarball.
  */
 
-/* ffsl,ffsll */
-
-#include "_string.h"
-
-/* Experimentally off - libc_hidden_proto(ffs) */
-
+#include <limits.h>
+#include <string.h>
+  
 int ffs(int i)
 {
 #if 1
@@ -53,3 +50,6 @@ int ffs(int i)
 #endif
 }
 libc_hidden_def(ffs)
+#if ULONG_MAX == UINT_MAX
+strong_alias_untyped(ffs, ffsl)
+#endif

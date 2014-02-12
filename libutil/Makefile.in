@@ -5,8 +5,11 @@
 # Licensed under the LGPL v2.1, see the file COPYING.LIB in this tarball.
 #
 
+subdirs += libutil
+
 CFLAGS-libutil := -DNOT_IN_libc -DIS_IN_libutil $(SSP_ALL_CFLAGS)
 
+LDFLAGS-$(UCLIBC_FORMAT_DSBT_ELF)-libutil.so := -Wl,--dsbt-index=8
 LDFLAGS-libutil.so := $(LDFLAGS)
 
 LIBS-libutil.so := $(LIBS)
@@ -33,9 +36,9 @@ libutil-a-y := $(libutil_OBJ)
 endif
 libutil-so-y := $(libutil_OBJ:.o=.os)
 
-lib-a-y += $(top_builddir)lib/libutil.a
-lib-so-y += $(top_builddir)lib/libutil.so
-objclean-y += libutil_clean
+lib-a-$(UCLIBC_HAS_LIBUTIL) += $(top_builddir)lib/libutil.a
+lib-so-$(UCLIBC_HAS_LIBUTIL) += $(top_builddir)lib/libutil.so
+objclean-y += CLEAN_libutil
 
 ifeq ($(DOMULTI),n)
 ifeq ($(DOPIC),y)
@@ -43,10 +46,10 @@ $(top_builddir)lib/libutil.so: $(top_builddir)lib/libutil.a $(libc.depend)
 else
 $(top_builddir)lib/libutil.so: $(libutil_OUT)/libutil_so.a $(libc.depend)
 endif
-	$(call link.so,$(libutil_FULL_NAME),$(MAJOR_VERSION))
+	$(call link.so,$(libutil_FULL_NAME),$(ABI_VERSION))
 else
 $(top_builddir)lib/libutil.so: $(libutil_OUT)/libutil.oS | $(libc.depend)
-	$(call linkm.so,$(libutil_FULL_NAME),$(MAJOR_VERSION))
+	$(call linkm.so,$(libutil_FULL_NAME),$(ABI_VERSION))
 endif
 
 $(libutil_OUT)/libutil_so.a: $(libutil-so-y)
@@ -62,5 +65,5 @@ $(top_builddir)lib/libutil.a: $(libutil-a-y)
 	$(Q)$(RM) $@
 	$(do_ar)
 
-libutil_clean:
+CLEAN_libutil:
 	$(do_rm) $(addprefix $(libutil_OUT)/*., o os oS a)

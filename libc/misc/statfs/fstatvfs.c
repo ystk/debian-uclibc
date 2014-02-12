@@ -27,12 +27,6 @@
 #include <sys/statfs.h>
 #include <sys/statvfs.h>
 
-/* Experimentally off - libc_hidden_proto(memset) */
-/* Experimentally off - libc_hidden_proto(strcmp) */
-/* Experimentally off - libc_hidden_proto(strsep) */
-libc_hidden_proto(setmntent)
-libc_hidden_proto(getmntent_r)
-libc_hidden_proto(endmntent)
 
 #ifndef __USE_FILE_OFFSET64
 extern int fstatfs (int __fildes, struct statfs *__buf)
@@ -47,9 +41,6 @@ extern int __REDIRECT_NTH (fstatfs, (int __fildes, struct statfs *__buf),
 #endif
 
 extern __typeof(fstatfs) __libc_fstatfs;
-libc_hidden_proto(__libc_fstatfs)
-libc_hidden_proto(fstat)
-libc_hidden_proto(stat)
 
 int fstatvfs (int fd, struct statvfs *buf)
 {
@@ -66,3 +57,4 @@ int fstatvfs (int fd, struct statvfs *buf)
     /* We signal success if the statfs call succeeded.  */
     return 0;
 }
+libc_hidden_def(fstatvfs)

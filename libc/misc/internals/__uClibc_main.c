@@ -1,5 +1,6 @@
 /*
- * Copyright (C) Feb 2001 Manuel Novoa III
+ * Copyright (C) 2006 by Steven J. Hill <sjhill@realitydiluted.com>
+ * Copyright (C) 2001 by Manuel Novoa III <mjn3@uclibc.org>
  * Copyright (C) 2000-2005 Erik Andersen <andersen@uclibc.org>
  *
  * Licensed under the LGPL v2.1, see the file COPYING.LIB in this tarball.
@@ -13,8 +14,10 @@
  * avoided in the static library case.
  */
 
-#define	_ERRNO_H
 #include <features.h>
+#ifndef __UCLIBC_HAS_THREADS_NATIVE__
+#define	_ERRNO_H
+#endif
 #include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
@@ -22,52 +25,35 @@
 #include <link.h>
 #include <bits/uClibc_page.h>
 #include <paths.h>
+#include <unistd.h>
 #include <asm/errno.h>
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <sys/sysmacros.h>
-
-libc_hidden_proto(exit)
-
-#ifdef __UCLIBC_HAS_PROGRAM_INVOCATION_NAME__
-/* Experimentally off - libc_hidden_proto(strrchr) */
+#ifdef __UCLIBC_HAS_THREADS_NATIVE__
+#include <errno.h>
+#include <pthread-functions.h>
+#include <not-cancel.h>
+#include <atomic.h>
 #endif
-#ifndef __ARCH_HAS_NO_LDSO__
-/* Experimentally off - libc_hidden_proto(memcpy) */
-libc_hidden_proto(getgid)
-libc_hidden_proto(getuid)
-libc_hidden_proto(getegid)
-libc_hidden_proto(geteuid)
-libc_hidden_proto(fstat)
-libc_hidden_proto(abort)
-
-extern __typeof(open) __libc_open;
-libc_hidden_proto(__libc_open)
-extern __typeof(fcntl) __libc_fcntl;
-libc_hidden_proto(__libc_fcntl)
-#endif
+#ifdef __UCLIBC_HAS_THREADS__
+#include <pthread.h>
+#endif 
 
 #ifndef SHARED
-void *__libc_stack_end=NULL;
+void *__libc_stack_end = NULL;
 
 # ifdef __UCLIBC_HAS_SSP__
 #  include <dl-osinfo.h>
+static uintptr_t stack_chk_guard;
 #  ifndef THREAD_SET_STACK_GUARD
 /* Only exported for architectures that don't store the stack guard canary
  * in thread local area. */
-#   include <stdint.h>
-uintptr_t stack_chk_guard;
 /* for gcc-4.1 non-TLS */
 uintptr_t __stack_chk_guard attribute_relro;
+#  endif
 /* for gcc-3.x + Etoh ssp */
-#   ifdef __UCLIBC_HAS_SSP_COMPAT__
-#    ifdef __HAVE_SHARED__
-strong_alias(__stack_chk_guard,__guard)
-#    else
-uintptr_t __guard attribute_relro;
-#    endif
-#   endif
-#  elif defined __UCLIBC_HAS_SSP_COMPAT__
+#  ifdef __UCLIBC_HAS_SSP_COMPAT__
 uintptr_t __guard attribute_relro;
 #  endif
 # endif
@@ -77,19 +63,71 @@ uintptr_t __guard attribute_relro;
  */
 
 void internal_function _dl_aux_init (ElfW(auxv_t) *av);
+
+#ifdef __UCLIBC_HAS_THREADS__
+/*
+ * uClibc internal locking requires that we have weak aliases
+ * for dummy functions in case libpthread.a is not linked in.
+ * This needs to be in compilation unit that is pulled always
+ * in or linker will disregard these weaks.
+ */
+
+static int __pthread_return_0 (pthread_mutex_t *unused) { return 0; }
+weak_alias (__pthread_return_0, __pthread_mutex_lock)
+weak_alias (__pthread_return_0, __pthread_mutex_trylock)
+weak_alias (__pthread_return_0, __pthread_mutex_unlock)
+
+int weak_function
+__pthread_mutex_init(pthread_mutex_t *mutex, const pthread_mutexattr_t *attr)
+{
+        return 0;
+}
+
+void weak_function
+_pthread_cleanup_push_defer(struct _pthread_cleanup_buffer *__buffer,
+                            void (*__routine) (void *), void *__arg)
+{
+        __buffer->__routine = __routine;
+        __buffer->__arg = __arg;
+}
+
+void weak_function
+_pthread_cleanup_pop_restore(struct _pthread_cleanup_buffer *__buffer,
+                             int __execute)
+{
+        if (__execute)
+                __buffer->__routine(__buffer->__arg);
+}
+#endif /* __UCLIBC_HAS_THREADS__ */
+
 #endif /* !SHARED */
+
+/* Defeat compiler optimization which assumes function addresses are never NULL */
+static __always_inline int not_null_ptr(const void *p)
+{
+	const void *q;
+	__asm__ (""
+		: "=r" (q) /* output */
+		: "0" (p) /* input */
+	);
+	return q != 0;
+}
 
 /*
  * Prototypes.
  */
-extern void weak_function _stdio_init(void) attribute_hidden;
 extern int *weak_const_function __errno_location(void);
 extern int *weak_const_function __h_errno_location(void);
+extern void weak_function _stdio_init(void) attribute_hidden;
 #ifdef __UCLIBC_HAS_LOCALE__
 extern void weak_function _locale_init(void) attribute_hidden;
 #endif
 #ifdef __UCLIBC_HAS_THREADS__
+#if !defined (__UCLIBC_HAS_THREADS_NATIVE__) || defined (SHARED)
 extern void weak_function __pthread_initialize_minimal(void);
+#else
+extern void __pthread_initialize_minimal(void);
+#endif
 #endif
 
 /* If __UCLIBC_FORMAT_SHARED_FLAT__, all array initialisation and finalisation
@@ -136,13 +174,13 @@ size_t __pagesize = 0;
 static void __check_one_fd(int fd, int mode)
 {
     /* Check if the specified fd is already open */
-    if (__libc_fcntl(fd, F_GETFD) == -1)
+    if (fcntl(fd, F_GETFD) == -1)
     {
 	/* The descriptor is probably not open, so try to use /dev/null */
-	int nullfd = __libc_open(_PATH_DEVNULL, mode);
+	int nullfd = open(_PATH_DEVNULL, mode);
 	/* /dev/null is major=1 minor=3.  Make absolutely certain
 	 * that is in fact the device that we have opened and not
-	 * some other wierd file... */
+	 * some other wierd file... [removed in uclibc] */
 	if (nullfd!=fd)
 	{
 		abort();
@@ -184,11 +222,9 @@ extern void __uClibc_init(void);
 libc_hidden_proto(__uClibc_init)
 void __uClibc_init(void)
 {
-    static smallint been_there_done_that;
-
-    if (been_there_done_that)
+    /* Don't recurse */
+    if (__pagesize)
 	return;
-    been_there_done_that++;
 
     /* Setup an initial value.  This may not be perfect, but is
      * better than  malloc using __pagesize=0 for atexit, ctors, etc.  */
@@ -199,7 +235,9 @@ void __uClibc_init(void)
      * __pthread_initialize_minimal so we can use pthread_locks
      * whenever they are needed.
      */
+#if !defined (__UCLIBC_HAS_THREADS_NATIVE__) || defined (SHARED)
     if (likely(__pthread_initialize_minimal!=NULL))
+#endif
 	__pthread_initialize_minimal();
 #endif
 
@@ -209,21 +247,18 @@ void __uClibc_init(void)
     stack_chk_guard = _dl_setup_stack_chk_guard();
 #  ifdef THREAD_SET_STACK_GUARD
     THREAD_SET_STACK_GUARD (stack_chk_guard);
-#   ifdef __UCLIBC_HAS_SSP_COMPAT__
-    __guard = stack_chk_guard;
-#   endif
 #  else
     __stack_chk_guard = stack_chk_guard;
-#   if !defined __HAVE_SHARED__ && defined __UCLIBC_HAS_SSP_COMPAT__
-     __guard = stack_chk_guard;
-#   endif
+#  endif
+#  ifdef __UCLIBC_HAS_SSP_COMPAT__
+    __guard = stack_chk_guard;
 #  endif
 # endif
 #endif
 
 #ifdef __UCLIBC_HAS_LOCALE__
     /* Initialize the global locale structure. */
-    if (likely(_locale_init!=NULL))
+    if (likely(not_null_ptr(_locale_init)))
 	_locale_init();
 #endif
 
@@ -233,7 +268,7 @@ void __uClibc_init(void)
      * Thus we get a nice size savings because the stdio functions
      * won't be pulled into the final static binary unless used.
      */
-    if (likely(_stdio_init != NULL))
+    if (likely(not_null_ptr(_stdio_init)))
 	_stdio_init();
 
 }
@@ -267,20 +302,31 @@ void __uClibc_fini(void)
 }
 libc_hidden_def(__uClibc_fini)
 
+#ifndef SHARED
+extern void __nptl_deallocate_tsd (void) __attribute ((weak));
+extern unsigned int __nptl_nthreads __attribute ((weak));
+#endif
+
 /* __uClibc_main is the new main stub for uClibc. This function is
  * called from crt1 (version 0.9.28 or newer), after ALL shared libraries
  * are initialized, just before we call the application's main function.
  */
 void __uClibc_main(int (*main)(int, char **, char **), int argc,
 		    char **argv, void (*app_init)(void), void (*app_fini)(void),
-		    void (*rtld_fini)(void), void *stack_end) attribute_noreturn;
+		    void (*rtld_fini)(void),
+		    void *stack_end attribute_unused) attribute_noreturn;
 void __uClibc_main(int (*main)(int, char **, char **), int argc,
 		    char **argv, void (*app_init)(void), void (*app_fini)(void),
-		    void (*rtld_fini)(void), void *stack_end)
+		    void (*rtld_fini)(void), void *stack_end attribute_unused)
 {
 #ifndef __ARCH_HAS_NO_LDSO__
     unsigned long *aux_dat;
     ElfW(auxv_t) auxvt[AT_EGID + 1];
+#endif
+
+#ifdef __UCLIBC_HAS_THREADS_NATIVE__
+	/* Result of the 'main' function.  */
+	int result;
 #endif
 
 #ifndef SHARED
@@ -395,41 +441,62 @@ void __uClibc_main(int (*main)(int, char **, char **), int argc,
      * have resulted in errno being set nonzero, so set it to 0 before
      * we call main.
      */
-    if (likely(__errno_location!=NULL))
+    if (likely(not_null_ptr(__errno_location)))
 	*(__errno_location()) = 0;
 
     /* Set h_errno to 0 as well */
-    if (likely(__h_errno_location!=NULL))
+    if (likely(not_null_ptr(__h_errno_location)))
 	*(__h_errno_location()) = 0;
 
-    /*
-     * Finally, invoke application's main and then exit.
-     */
-    exit(main(argc, argv, __environ));
-}
+#if defined HAVE_CLEANUP_JMP_BUF && defined __UCLIBC_HAS_THREADS_NATIVE__
+	/* Memory for the cancellation buffer.  */
+	struct pthread_unwind_buf unwind_buf;
 
-#if defined(__UCLIBC_HAS_THREADS__) && !defined(SHARED)
-/* Weaks for internal library use only.
- *
- * We need to define weaks here to cover all the pthread functions that
- * libc itself will use so that we aren't forced to link libc against
- * libpthread.  This file is only used in libc.a and since we have
- * weaks here, they will be automatically overridden by libpthread.a
- * if it gets linked in.
- */
+	int not_first_call;
+	not_first_call =
+		setjmp ((struct __jmp_buf_tag *) unwind_buf.cancel_jmp_buf);
+	if (__builtin_expect (! not_first_call, 1))
+	{
+		struct pthread *self = THREAD_SELF;
 
-static int __pthread_return_0 (void) { return 0; }
-static void __pthread_return_void (void) { return; }
+		/* Store old info.  */
+		unwind_buf.priv.data.prev = THREAD_GETMEM (self, cleanup_jmp_buf);
+		unwind_buf.priv.data.cleanup = THREAD_GETMEM (self, cleanup);
 
-weak_alias (__pthread_return_0, __pthread_mutex_init)
-weak_alias (__pthread_return_0, __pthread_mutex_lock)
-weak_alias (__pthread_return_0, __pthread_mutex_trylock)
-weak_alias (__pthread_return_0, __pthread_mutex_unlock)
-weak_alias (__pthread_return_void, _pthread_cleanup_push_defer)
-weak_alias (__pthread_return_void, _pthread_cleanup_pop_restore)
-# ifdef __UCLIBC_HAS_THREADS_NATIVE__
-weak_alias (__pthread_return_0, __pthread_mutexattr_init)
-weak_alias (__pthread_return_0, __pthread_mutexattr_destroy)
-weak_alias (__pthread_return_0, __pthread_mutexattr_settype)
+		/* Store the new cleanup handler info.  */
+		THREAD_SETMEM (self, cleanup_jmp_buf, &unwind_buf);
+
+		/* Run the program.  */
+		result = main (argc, argv, __environ);
+	}
+	else
+	{
+		/* Remove the thread-local data.  */
+# ifdef SHARED
+		__libc_pthread_functions.ptr__nptl_deallocate_tsd ();
+# else
+		__nptl_deallocate_tsd ();
 # endif
+
+		/* One less thread.  Decrement the counter.  If it is zero we
+		   terminate the entire process.  */
+		result = 0;
+# ifdef SHARED
+		unsigned int *const ptr = __libc_pthread_functions.ptr_nthreads;
+# else
+		unsigned int *const ptr = &__nptl_nthreads;
+# endif
+
+		if (! atomic_decrement_and_test (ptr))
+			/* Not much left to do but to exit the thread, not the process.  */
+			__exit_thread_inline (0);
+	}
+
+	exit (result);
+#else
+	/*
+	 * Finally, invoke application's main and then exit.
+	 */
+	exit (main (argc, argv, __environ));
 #endif
+}

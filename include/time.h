@@ -187,12 +187,15 @@ extern clock_t clock (void) __THROW;
 
 /* Return the current time and put it in *TIMER if TIMER is not NULL.  */
 extern time_t time (time_t *__timer) __THROW;
+libc_hidden_proto(time)
 
 #ifdef __UCLIBC_HAS_FLOATS__
 /* Return the difference between TIME1 and TIME0.  */
 extern double difftime (time_t __time1, time_t __time0)
      __THROW __attribute__ ((__const__));
 #endif /* __UCLIBC_HAS_FLOATS__ */
+
+#define CLOCK_IDFIELD_SIZE	3
 
 /* Return the `time_t' representation of TP and normalize TP.  */
 extern time_t mktime (struct tm *__tp) __THROW;
@@ -224,10 +227,12 @@ extern size_t strftime_l (char *__restrict __s, size_t __maxsize,
 			  __const char *__restrict __format,
 			  __const struct tm *__restrict __tp,
 			  __locale_t __loc) __THROW;
+libc_hidden_proto(strftime_l)
 
 extern char *strptime_l (__const char *__restrict __s,
 			 __const char *__restrict __fmt, struct tm *__tp,
 			 __locale_t __loc) __THROW;
+libc_hidden_proto(strptime_l)
 # endif
 #endif
 
@@ -240,6 +245,7 @@ extern struct tm *gmtime (__const time_t *__timer) __THROW;
 /* Return the `struct tm' representation
    of *TIMER in the local timezone.  */
 extern struct tm *localtime (__const time_t *__timer) __THROW;
+libc_hidden_proto(localtime)
 __END_NAMESPACE_STD
 
 # if defined __USE_POSIX || defined __USE_MISC
@@ -252,15 +258,18 @@ extern struct tm *gmtime_r (__const time_t *__restrict __timer,
    using *TP to store the result.  */
 extern struct tm *localtime_r (__const time_t *__restrict __timer,
 			       struct tm *__restrict __tp) __THROW;
+libc_hidden_proto(localtime_r)
 # endif	/* POSIX or misc */
 
 __BEGIN_NAMESPACE_STD
 /* Return a string of the form "Day Mon dd hh:mm:ss yyyy\n"
    that is the representation of TP in this format.  */
 extern char *asctime (__const struct tm *__tp) __THROW;
+libc_hidden_proto(asctime)
 
 /* Equivalent to `asctime (localtime (timer))'.  */
 extern char *ctime (__const time_t *__timer) __THROW;
+libc_hidden_proto(ctime)
 __END_NAMESPACE_STD
 
 # if defined __USE_POSIX || defined __USE_MISC
@@ -270,6 +279,7 @@ __END_NAMESPACE_STD
    that is the representation of TP in this format.  */
 extern char *asctime_r (__const struct tm *__restrict __tp,
 			char *__restrict __buf) __THROW;
+libc_hidden_proto(asctime_r)
 
 /* Equivalent to `asctime_r (localtime_r (timer, *TMP*), buf)'.  */
 extern char *ctime_r (__const time_t *__restrict __timer,
@@ -293,6 +303,7 @@ extern char *tzname[2];
 /* Set time conversion information from the TZ environment variable.
    If TZ is not defined, a locale-dependent default is used.  */
 extern void tzset (void) __THROW;
+libc_hidden_proto(tzset)
 # endif
 
 # if defined __USE_SVID || defined __USE_XOPEN
@@ -336,6 +347,7 @@ extern int dysize (int __year) __THROW  __attribute__ ((__const__));
    __THROW.  */
 extern int nanosleep (__const struct timespec *__requested_time,
 		      struct timespec *__remaining);
+libc_hidden_proto(nanosleep)
 
 
 /* Get resolution of clock CLOCK_ID.  */
@@ -348,10 +360,9 @@ extern int clock_gettime (clockid_t __clock_id, struct timespec *__tp) __THROW;
 /* Set clock CLOCK_ID to value TP.  */
 extern int clock_settime (clockid_t __clock_id, __const struct timespec *__tp)
      __THROW;
-#endif /* __UCLIBC_HAS_REALTIME__ */
-#ifdef __UCLIBC_MJN3_ONLY__
-#warning "mjn3 FIXME: a bunch of unimplemented function prototypes."
-#  if defined __USE_XOPEN2K && defined __UCLIBC_HAS_ADVANCED_REALTIME__
+#  endif /* __UCLIBC_HAS_REALTIME__ */
+#  ifdef __UCLIBC_HAS_THREADS_NATIVE__
+#   if defined __USE_XOPEN2K && defined __UCLIBC_HAS_ADVANCED_REALTIME__
 /* High-resolution sleep with the specified clock.
 
    This function is a cancellation point and therefore not marked with
@@ -362,8 +373,8 @@ extern int clock_nanosleep (clockid_t __clock_id, int __flags,
 
 /* Return clock ID for CPU-time clock.  */
 extern int clock_getcpuclockid (pid_t __pid, clockid_t *__clock_id) __THROW;
-#  endif
-#endif /* __UCLIBC_MJN3_ONLY__ */
+#   endif
+#  endif /* __UCLIBC_HAS_THREADS_NATIVE__ */
 
 #  if defined __UCLIBC_HAS_REALTIME__
 /* Create new per-process timer using CLOCK_ID.  */
@@ -432,13 +443,6 @@ extern int getdate_r (__const char *__restrict __string,
 #endif /* __UCLIBC_MJN3_ONLY__ */
 
 __END_DECLS
-
-
-#ifdef _LIBC
-/* Experiment. Grep for 'libc_hidden_proto(time)' if need to revert */
-libc_hidden_proto(time)
-#endif
-
 
 #endif /* <time.h> included.  */
 

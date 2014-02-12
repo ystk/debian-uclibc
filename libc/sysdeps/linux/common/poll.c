@@ -19,35 +19,35 @@
 
 #include <sys/syscall.h>
 #include <sys/poll.h>
+#include <bits/kernel-features.h>
 
-extern __typeof(poll) __libc_poll;
-
-#ifdef __NR_poll
-
-# define __NR___libc_poll __NR_poll
-_syscall3(int, __libc_poll, struct pollfd *, fds,
-	unsigned long int, nfds, int, timeout)
-
-#elif defined(__NR_ppoll) && defined __UCLIBC_LINUX_SPECIFIC__
-
-libc_hidden_proto(ppoll)
-int __libc_poll(struct pollfd *fds, nfds_t nfds, int timeout)
-{
-	struct timespec *ts = NULL, tval;
-	if (timeout > 0) {
-		tval.tv_sec = timeout / 1000;
-		tval.tv_nsec = (timeout % 1000) * 1000000;
-		ts = &tval;
-	} else if (timeout == 0) {
-		tval.tv_sec = 0;
-		tval.tv_nsec = 0;
-		ts = &tval;
-	}
-	return ppoll(fds, nfds, ts, NULL);
-}
-
+#ifdef __UCLIBC_HAS_THREADS_NATIVE__
+#include <sysdep-cancel.h>
 #else
-/* ugh, this arch lacks poll, so we need to emulate this crap ... */
+#define SINGLE_THREAD_P 1
+#endif
+
+libc_hidden_proto(poll)
+
+#if defined __ASSUME_POLL_SYSCALL && defined __NR_poll
+
+#define __NR___syscall_poll __NR_poll
+static inline _syscall3(int, __syscall_poll, struct pollfd *, fds,
+			unsigned long int, nfds, int, timeout);
+
+int poll(struct pollfd *fds, nfds_t nfds, int timeout)
+{
+    if (SINGLE_THREAD_P)
+	return __syscall_poll(fds, nfds, timeout);
+
+#ifdef __UCLIBC_HAS_THREADS_NATIVE__
+    int oldtype = LIBC_CANCEL_ASYNC ();
+    int result = __syscall_poll(fds, nfds, timeout);
+    LIBC_CANCEL_RESET (oldtype);
+    return result;
+#endif
+}
+#else /* !__NR_poll */
 
 #include <alloca.h>
 #include <sys/types.h>
@@ -57,8 +57,6 @@ int __libc_poll(struct pollfd *fds, nfds_t nfds, int timeout)
 #include <sys/param.h>
 #include <unistd.h>
 
-/* Experimentally off - libc_hidden_proto(memcpy) */
-/* Experimentally off - libc_hidden_proto(memset) */
 libc_hidden_proto(getdtablesize)
 libc_hidden_proto(select)
 
@@ -70,7 +68,7 @@ libc_hidden_proto(select)
    Returns the number of file descriptors with events, zero if timed out,
    or -1 for errors.  */
 
-int __libc_poll(struct pollfd *fds, nfds_t nfds, int timeout)
+int poll(struct pollfd *fds, nfds_t nfds, int timeout)
 {
     static int max_fd_size;
     struct timeval tv;
@@ -229,6 +227,4 @@ int __libc_poll(struct pollfd *fds, nfds_t nfds, int timeout)
 }
 
 #endif
-libc_hidden_proto(poll)
-weak_alias(__libc_poll,poll)
-libc_hidden_weak(poll)
+libc_hidden_def(poll)

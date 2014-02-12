@@ -15,12 +15,11 @@ LOCALE_DATA_FILENAME := uClibc-locale-20081111-$(ARCH_NATIVE_BIT)-$(if $(ARCH_LI
 
 BUILD_CFLAGS-locale-common := \
 	-D__UCLIBC_GEN_LOCALE \
-	-I$(top_builddir) \
-	-DUCLIBC_CTYPE_HEADER='"include/bits/uClibc_ctype.h"'
+	-I$(top_builddir)
 
 BUILD_CFLAGS-gen_wc8bit := $(BUILD_CFLAGS-locale-common) -DCTYPE_PACKED=1
 BUILD_CFLAGS-gen_wctype := $(BUILD_CFLAGS-locale-common)
-BUILD_CFLAGS-gen_ldc :=
+BUILD_CFLAGS-gen_ldc := -I$(locale_OUT)
 ifeq ($(UCLIBC_HAS_WCHAR),y)
 BUILD_CFLAGS-gen_wc8bit += -DDO_WIDE_CHAR=1
 BUILD_CFLAGS-gen_ldc += -D__WCHAR_ENABLED=1
@@ -35,11 +34,12 @@ DEPH-locale := $(top_builddir)include/bits/uClibc_config.h
 DEPH-gen_collate := $(DEPH-locale)
 DEPH-gen_ldc := $(addprefix $(locale_OUT)/,c8tables.h wctables.h locale_tables.h locale_collate.h) $(DEPH-locale)
 DEPH-gen_locale := $(addprefix $(locale_OUT)/,c8tables.h) $(DEPH-locale)
-DEPH-gen_wc8bit := $(top_builddir)/include/bits/uClibc_ctype.h $(DEPH-locale)
-DEPH-gen_wctype := $(top_builddir)/include/bits/uClibc_ctype.h $(DEPH-locale)
+DEPH-gen_wc8bit := $(top_builddir)include/bits/uClibc_ctype.h $(DEPH-locale)
+DEPH-gen_wctype := $(top_builddir)include/bits/uClibc_ctype.h $(DEPH-locale)
 
 locale_HOBJ := gen_collate gen_ldc gen_locale gen_wc8bit gen_wctype
 locale_HOBJ := $(addprefix $(locale_OUT)/,$(locale_HOBJ))
+$(locale_HOBJ): | $(locale_OUT)
 
 locale_SRC := $(locale_OUT)/locale_data.c
 locale_OBJ := $(locale_OUT)/locale_data.o
@@ -50,8 +50,23 @@ CFLAGS-locale_data.c := -D__WCHAR_ENABLED -I$(locale_OUT) -I$(locale_DIR)
 headers: $(locale_headers-y)
 
 libc-$(UCLIBC_HAS_LOCALE) += $(locale_OBJ)
-
 libc-nomulti-$(UCLIBC_HAS_LOCALE) += $(locale_OBJ)
+
+$(locale_OUT)%.o:  $(locale_OUT)%.c FORCE ; $(compile.c)
+$(locale_OUT)%.os: $(locale_OUT)%.c FORCE ; $(compile.c)
+$(locale_OUT)%.oS: $(locale_OUT)%.c FORCE ; $(compile.c)
+$(locale_OUT)%.o:  $(locale_OUT)%.S FORCE ; $(compile.S)
+$(locale_OUT)%.os: $(locale_OUT)%.S FORCE ; $(compile.S)
+$(locale_OUT)%.oS: $(locale_OUT)%.S FORCE ; $(compile.S)
+$(locale_OUT)%.o:  $(locale_OUT)%.s FORCE ; $(compile.S)
+$(locale_OUT)%.os: $(locale_OUT)%.s FORCE ; $(compile.S)
+$(locale_OUT)%.oS: $(locale_OUT)%.s FORCE ; $(compile.S)
+$(locale_OUT)%.i:  $(locale_OUT)%.c FORCE ; $(compile.i)
+$(locale_OUT)%.i:  $(locale_OUT)%.S FORCE ; $(compile.i)
+$(locale_OUT)%.s:  $(locale_OUT)%.c FORCE ; $(compile.s)
+$(locale_OUT)%.s:  $(locale_OUT)%.S FORCE ; $(compile.s)
+$(locale_OUT)%.dep:
+
 
 locale_headers: headers $(top_builddir)include/bits/uClibc_locale_data.h
 
@@ -65,12 +80,12 @@ $(locale_OUT)/codesets.txt:
 	    echo " "; \
 	    echo "You do not have a codesets.txt file.  Please create this "; \
 	    echo "file in the $(locale_OUT) directory by running something like: "; \
-	    echo "  cd $(locale_DIR)/ && find charmaps -name \"*.pairs\" > \\"; \
+	    echo "  find $(CURDIR)/$(locale_DIR)/charmaps -name \"*.pairs\" > \\"; \
 	    echo "        $@"; \
 	    echo "and then edit that file to disable/enable the codesets you wish to support. "; \
 	    echo " "; \
 	    false; \
-	fi;
+	fi
 
 $(locale_OUT)/locales.txt:
 	@if [ ! -f $@ ] ; then \
@@ -85,17 +100,27 @@ $(locale_OUT)/locales.txt:
 	    echo "to support. "; \
 	    echo " "; \
 	    false; \
-	fi;
+	fi
 
 else
 
 $(locale_OUT)/codesets.txt:
 	@$(disp_gen)
 ifeq ($(UCLIBC_BUILD_MINIMAL_LOCALE),y)
-	$(Q)echo "charmaps/ASCII.pairs" > $@ ; \
-	$(Q)echo "charmaps/ISO-8859-1.pairs" >> $@
+	$(Q)echo "$(CURDIR)/$(locale_DIR)/charmaps/ASCII.pairs" > $@
+	$(Q)echo "$(CURDIR)/$(locale_DIR)/charmaps/ISO-8859-1.pairs" >> $@
 else
-	$(Q)(cd $(locale_DIR)/ && find charmaps/ -name '*.pairs' | sort ) > $@
+	$(Q)set -e; \
+		tmp=`mktemp $@.XXXXXX 2>/dev/null || true`; \
+		[ -z "$$tmp" ] && tmp='$@.new'; \
+		find $(CURDIR)/$(locale_DIR)/charmaps/ -name '*.pairs' | \
+			sort > $$tmp; \
+		[ -s $$tmp ]; \
+		if cmp $@ $$tmp >/dev/null 2>&1; then \
+			$(RM) $$tmp; \
+		else \
+			mv -f $$tmp $@; \
+		fi
 endif
 
 # the lines beginning w/ '#-' are mandatory
@@ -103,13 +128,15 @@ endif
 $(locale_OUT)/locales.txt: $(locale_DIR)/LOCALES
 	@$(disp_gen)
 ifeq ($(UCLIBC_BUILD_MINIMAL_LOCALE),y)
-	$(Q)echo "@euro e" > $@ ; \
-	$(Q)echo "#-" >> $@ ; \
-	$(Q)echo "UTF-8 yes" >> $@ ; \
-	$(Q)echo "8-BIT yes" >> $@ ; \
-	$(Q)echo "#-" >> $@ ; \
-	$(Q)echo "en_US.UTF-8 UTF-8" >> $@ ; \
-	$(Q)echo "en_US ISO-8859-1" >> $@
+	$(Q)echo "@euro e" > $@
+	$(Q)echo "#-" >> $@
+	$(Q)echo "UTF-8 yes" >> $@
+	$(Q)echo "8-BIT yes" >> $@
+	$(Q)echo "#-" >> $@
+	$(Q)for locale in $(call qstrip,$(UCLIBC_BUILD_MINIMAL_LOCALES)); do \
+		echo "$$locale.UTF-8 UTF-8"; \
+		echo "$$locale ISO-8859-1"; \
+	done >> $@
 else
 	$(Q)cat $< > $@
 endif
@@ -145,18 +172,16 @@ endif
 # grep fopen *.c
 $(locale_OUT)/c8tables.h: $(locale_OUT)/gen_wc8bit $(locale_OUT)/codesets.txt
 	@$(disp_gen)
-	$(Q)(cd $(<D) && ./$(<F) `cat $(word 2,$(^F))`)
+	$(Q)$< `cat $(word 2,$^)` > $@
 
 # Warning! Beware tr_TR toupper/tolower exceptions!
 $(locale_OUT)/wctables.h: $(locale_OUT)/gen_wctype
 	@$(disp_gen)
-	$(Q)(cd $(<D) || exit 1 ; \
-		./$(<F) $(FLAG-locale-verbose) en_US || \
-		./$(<F) $(FLAG-locale-verbose) en_US.UTF-8 || \
-		./$(<F) $(FLAG-locale-verbose) en_US.iso8859-1 || \
-		./$(<F) $(FLAG-locale-verbose) en_GB || \
-		./$(<F) $(FLAG-locale-verbose) en_GB.UTF-8 \
-	)
+	$(Q)for locale in $(call qstrip,$(UCLIBC_BUILD_MINIMAL_LOCALES)) en_US en_GB; do \
+		$< $(FLAG-locale-verbose) $$locale > $@ || \
+		$< $(FLAG-locale-verbose) $$locale.UTF-8 > $@ || \
+		$< $(FLAG-locale-verbose) $$locale.iso8859-1 > $@ && break; \
+	done
 
 $(locale_OUT)/locale_tables.h: $(locale_OUT)/gen_locale $(locale_OUT)/locales.txt
 	@$(disp_gen)
@@ -175,13 +200,13 @@ $(locale_OUT)/locale_collate.h: $(locale_OUT)/gen_collate $(locale_OUT)/locale_t
 
 $(locale_OUT)/$(LOCALE_DATA_FILENAME):
 ifeq ($(UCLIBC_DOWNLOAD_PREGENERATED_LOCALE_DATA),y)
-	( cd $(dir $@); $(WGET) http://www.uclibc.org/downloads/$(notdir $@) )
+	( cd $(@D); $(WGET) http://www.uclibc.org/downloads/$(@F) )
 endif
 
 ifeq ($(UCLIBC_PREGENERATED_LOCALE_DATA),y)
 
 $(locale_SRC): $(locale_OUT)/$(LOCALE_DATA_FILENAME)
-	zcat $< | $(TAR) -xv -C $(dir $@) -f -
+	zcat $< | $(TAR) -xv -C $(@D) -f -
 	touch $@
 	# we use the one in locale_DIR
 	#$(RM) $(locale_OUT)/locale_mmap.h
@@ -209,9 +234,9 @@ $(top_builddir)include/bits/uClibc_locale_data.h: $(locale_OUT)/uClibc_locale_da
 	$(Q)$(AWK) 'BEGIN{i=1}{if (/WANT_/) i=/endif/;else if (i) print $0}' \
 		$< > $@
 
-objclean-y += locale_clean
+objclean-y += CLEAN_extra/locale
 
 # lmmtolso.c/gen_mmap.c/tst-*.c not used
-locale_clean:
+CLEAN_extra/locale:
 	$(do_rm) $(locale_HOBJ) $(locale_SRC) $(addprefix $(locale_OUT)/*., o os txt) \
 		$(addprefix $(locale_OUT)/,$(addsuffix .h,uClibc_locale_data lt_defines c8tables wctables locale_tables locale_collate) lmmtolso gen_mmap locale.mmap)

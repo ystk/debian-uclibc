@@ -71,7 +71,7 @@ _dl_linux_resolver(struct elf_resolve *tpnt, int reloc_entry)
 	got_addr = (char **)instr_addr;
 
 	/* Get the address of the GOT entry. */
-	new_addr = _dl_find_hash(symname, tpnt->symbol_scope, tpnt, ELF_RTYPE_CLASS_PLT);
+	new_addr = _dl_find_hash(symname, tpnt->symbol_scope, tpnt, ELF_RTYPE_CLASS_PLT, NULL);
 	if (unlikely(!new_addr)) {
 		_dl_dprintf(2, "%s: can't resolve symbol '%s' in lib '%s'.\n", _dl_progname, symname, tpnt->libname);
 		_dl_exit(1);
@@ -162,30 +162,40 @@ _dl_do_reloc(struct elf_resolve *tpnt, struct dyn_elf *scope,
 	int reloc_type;
 	int symtab_index;
 	char *symname;
+	struct elf_resolve *tls_tpnt = NULL;
 	unsigned long *reloc_addr;
 	unsigned long symbol_addr;
 #if defined (__SUPPORT_LD_DEBUG__)
 	unsigned long old_val;
 #endif
+	struct symbol_ref sym_ref;
 
 	reloc_addr = (unsigned long *)(intptr_t)(tpnt->loadaddr + (unsigned long)rpnt->r_offset);
 	reloc_type = ELF32_R_TYPE(rpnt->r_info);
 	symtab_index = ELF32_R_SYM(rpnt->r_info);
 	symbol_addr = 0;
+	sym_ref.sym = &symtab[symtab_index];
+	sym_ref.tpnt = NULL;
 	symname = strtab + symtab[symtab_index].st_name;
 
 	if (symtab_index) {
 		symbol_addr = (unsigned long)_dl_find_hash(symname, scope, tpnt,
-							   elf_machine_type_class(reloc_type));
+							   elf_machine_type_class(reloc_type), &sym_ref);
 
 		/*
 		 * We want to allow undefined references to weak symbols - this
 		 * might have been intentional.  We should not be linking local
 		 * symbols here, so all bases should be covered.
 		 */
-		if (unlikely(!symbol_addr && ELF32_ST_BIND(symtab[symtab_index].st_info) != STB_WEAK))
+		if (unlikely(!symbol_addr && (ELF_ST_TYPE(symtab[symtab_index].st_info) != STT_TLS)
+					&& ELF32_ST_BIND(symtab[symtab_index].st_info) != STB_WEAK))
 			return 1;
+		tls_tpnt = sym_ref.tpnt;
+	} else {
+		symbol_addr = symtab[symtab_index].st_value;
+		tls_tpnt = tpnt;
 	}
+	
 
 #if defined (__SUPPORT_LD_DEBUG__)
 	old_val = *reloc_addr;
@@ -222,6 +232,26 @@ _dl_do_reloc(struct elf_resolve *tpnt, struct dyn_elf *scope,
 					   symtab[symtab_index].st_size);
 			}
 			break;
+#if defined USE_TLS && USE_TLS
+		case R_386_TLS_DTPMOD32:
+			*reloc_addr = tls_tpnt->l_tls_modid;
+			break;
+		case R_386_TLS_DTPOFF32:
+			/* During relocation all TLS symbols are defined and used.
+			 * Therefore the offset is already correct. */
+			*reloc_addr = symbol_addr;
+			break;
+		case R_386_TLS_TPOFF32:
+			/* The offset is positive, backward from the thread pointer. */
+			CHECK_STATIC_TLS((struct link_map*) tls_tpnt);
+			*reloc_addr += tls_tpnt->l_tls_offset - symbol_addr;
+			break;
+		case R_386_TLS_TPOFF:
+			/* The offset is negative, forward from the thread pointer. */
+			CHECK_STATIC_TLS((struct link_map*) tls_tpnt);
+			*reloc_addr += symbol_addr - tls_tpnt->l_tls_offset;
+			break;
+#endif
 		default:
 			return -1;
 	}

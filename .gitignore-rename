@@ -8,15 +8,16 @@
 #
 *.os
 *.oS
-*.dep
 *.a
 *.i
 *.o
 *.depend
-lib
+lib/
+install_dir/
 .config*
 .*.dep
 /*.log
+cscope.*
 
 #
 # Debugging files

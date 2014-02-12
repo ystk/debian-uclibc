@@ -124,7 +124,6 @@ libc_hidden_proto(strcoll)
 extern size_t strxfrm (char *__restrict __dest,
 		       __const char *__restrict __src, size_t __n)
      __THROW __nonnull ((2));
-libc_hidden_proto(strxfrm)
 __END_NAMESPACE_STD
 
 #if defined __USE_GNU && defined __UCLIBC_HAS_XLOCALE__
@@ -257,7 +256,6 @@ libc_hidden_proto(strcasestr)
 extern void *memmem (__const void *__haystack, size_t __haystacklen,
 		     __const void *__needle, size_t __needlelen)
      __THROW __attribute_pure__ __nonnull ((1, 3));
-libc_hidden_proto(memmem)
 
 /* Copy N bytes of SRC to DEST, return pointer to bytes after the
    last written byte.  */
@@ -307,6 +305,7 @@ __END_NAMESPACE_STD
    ERRNUM.  */
 extern int __xpg_strerror_r (int __errnum, char *__buf, size_t __buflen)
      __THROW __nonnull ((2));
+libc_hidden_proto(__xpg_strerror_r)
 #  ifdef __REDIRECT_NTH
 extern int __REDIRECT_NTH (strerror_r,
 			   (int __errnum, char *__buf, size_t __buflen),
@@ -319,6 +318,7 @@ extern int __REDIRECT_NTH (strerror_r,
    used.  */
 extern char *__glibc_strerror_r (int __errnum, char *__buf, size_t __buflen)
      __THROW __nonnull ((2));
+libc_hidden_proto(__glibc_strerror_r)
 #  ifdef __REDIRECT_NTH
 extern char * __REDIRECT_NTH (strerror_r,
 			   (int __errnum, char *__buf, size_t __buflen),
@@ -376,7 +376,7 @@ libc_hidden_proto(ffs)
 
 /* The following two functions are non-standard but necessary for non-32 bit
    platforms.  */
-#if 0 /*def	__USE_GNU*/
+#ifdef __USE_GNU
 extern int ffsl (long int __l) __THROW __attribute__ ((__const__));
 #  ifdef __GNUC__
 __extension__ extern int ffsll (long long int __ll)
@@ -420,44 +420,41 @@ libc_hidden_proto(strsep)
 
 #ifdef	__USE_GNU
 /* Compare S1 and S2 as strings holding name & indices/version numbers.  */
-#if 0
 extern int strverscmp (__const char *__s1, __const char *__s2)
      __THROW __attribute_pure__ __nonnull ((1, 2));
 libc_hidden_proto(strverscmp)
-#endif
 
 /* Return a string describing the meaning of the signal number in SIG.  */
 extern char *strsignal (int __sig) __THROW;
 libc_hidden_proto(strsignal)
 
 /* Copy SRC to DEST, returning the address of the terminating '\0' in DEST.  */
-#if 0 /* uClibc: disabled */
+# if 0 /* uClibc: disabled */
 extern char *__stpcpy (char *__restrict __dest, __const char *__restrict __src)
      __THROW __nonnull ((1, 2));
-#endif
+# endif
 extern char *stpcpy (char *__restrict __dest, __const char *__restrict __src)
      __THROW __nonnull ((1, 2));
 libc_hidden_proto(stpcpy)
 
 /* Copy no more than N characters of SRC to DEST, returning the address of
    the last character written into DEST.  */
-#if 0 /* uClibc: disabled */
+# if 0 /* uClibc: disabled */
 extern char *__stpncpy (char *__restrict __dest,
 			__const char *__restrict __src, size_t __n)
      __THROW __nonnull ((1, 2));
-#endif
+# endif
 extern char *stpncpy (char *__restrict __dest,
 		      __const char *__restrict __src, size_t __n)
      __THROW __nonnull ((1, 2));
-libc_hidden_proto(stpncpy)
 
-#if 0							/* uClibc does not support strfry or memfrob. */
+# if 0			/* uClibc does not support strfry or memfrob. */
 /* Sautee STRING briskly.  */
 extern char *strfry (char *__string) __THROW __nonnull ((1));
 
 /* Frobnicate N bytes of S.  */
 extern void *memfrob (void *__s, size_t __n) __THROW __nonnull ((1));
-#endif
+# endif
 
 # ifndef basename
 /* Return the file name within directory of FILENAME.  We don't
@@ -467,7 +464,7 @@ extern void *memfrob (void *__s, size_t __n) __THROW __nonnull ((1));
 extern char *basename (__const char *__filename) __THROW __nonnull ((1));
 libc_hidden_proto(basename)
 # endif
-#endif
+#endif /* __USE_GNU */
 
 
 #ifdef	__USE_BSD
@@ -482,4 +479,11 @@ libc_hidden_proto(strlcpy)
 
 __END_DECLS
 
-#endif /* string.h  */
+
+#if defined(_LIBC) && defined(__UCLIBC_HAS_STRING_ARCH_OPT__)
+# if defined __i386__
+#  include <../libc/string/i386/string.h>
+# endif
+#endif
+
+#endif /* string.h */

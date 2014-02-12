@@ -146,7 +146,6 @@
 #include <bits/uClibc_uintmaxtostr.h>
 #include <bits/uClibc_mutex.h>
 
-
 #ifdef __UCLIBC_HAS_WCHAR__
 #include <wchar.h>
 #endif
@@ -154,39 +153,6 @@
 #include <xlocale.h>
 #endif
 
-libc_hidden_proto(asctime)
-libc_hidden_proto(asctime_r)
-libc_hidden_proto(ctime)
-libc_hidden_proto(localtime)
-libc_hidden_proto(localtime_r)
-
-/* Experimentally off - libc_hidden_proto(memset) */
-/* Experimentally off - libc_hidden_proto(memcpy) */
-/* Experimentally off - libc_hidden_proto(strcmp) */
-/* Experimentally off - libc_hidden_proto(strcpy) */
-/* Experimentally off - libc_hidden_proto(strlen) */
-/* Experimentally off - libc_hidden_proto(strncpy) */
-/* libc_hidden_proto(sprintf) */
-libc_hidden_proto(open)
-libc_hidden_proto(read)
-libc_hidden_proto(close)
-libc_hidden_proto(getenv)
-libc_hidden_proto(tzset)
-libc_hidden_proto(gettimeofday)
-/* Experimentally off - libc_hidden_proto(strncasecmp) */
-libc_hidden_proto(strtol)
-libc_hidden_proto(strtoul)
-libc_hidden_proto(nl_langinfo)
-
-#ifdef __UCLIBC_HAS_XLOCALE__
-/* Experimentally off - libc_hidden_proto(strncasecmp_l) */
-libc_hidden_proto(strtol_l)
-libc_hidden_proto(strtoul_l)
-libc_hidden_proto(nl_langinfo_l)
-libc_hidden_proto(__ctype_b_loc)
-#elif defined __UCLIBC_HAS_CTYPE_TABLES__
-libc_hidden_proto(__ctype_b)
-#endif
 
 #ifndef __isleap
 #define __isleap(y) ( !((y) % 4) && ( ((y) % 100) || !((y) % 400) ) )
@@ -308,7 +274,7 @@ libc_hidden_def(asctime)
  * If we take the implicit assumption as given, then the implementation below
  * is still incorrect for tm_year values < -900, as there will be either
  * 0-padding and/or a missing negative sign for the year conversion .  But given
- * the ususal use of asctime(), I think it isn't unreasonable to restrict correct
+ * the usual use of asctime(), I think it isn't unreasonable to restrict correct
  * operation to the domain of years between 1000 and 9999.
  */
 
@@ -406,16 +372,16 @@ char *asctime_r(register const struct tm *__restrict ptm,
 		if (((unsigned int) tmp) >= 100) { /* Just check 2 digit non-neg. */
 			buffer[-1] = *buffer = '?';
 		} else
-#else  /* SAFE_ASCTIME_R */
+#else
 		assert(((unsigned int) tmp) < 100); /* Just check 2 digit non-neg. */
-#endif /* SAFE_ASCTIME_R */
+#endif
 		{
 			*buffer = '0' + (tmp % 10);
 #ifdef __BCC__
 			buffer[-1] = '0' + (tmp/10);
-#else  /* __BCC__ */
+#else
 			buffer[-1] += (tmp/10);
-#endif /* __BCC__ */
+#endif
 		}
 	} while ((buffer -= 2)[-2] == '0');
 
@@ -432,8 +398,6 @@ libc_hidden_def(asctime_r)
 #ifdef L_clock
 
 #include <sys/times.h>
-
-libc_hidden_proto(times)
 
 #ifndef __BCC__
 #if CLOCKS_PER_SEC != 1000000L
@@ -501,8 +465,23 @@ clock_t clock(void)
 
 char *ctime(const time_t *t)
 {
-	/* ANSI/ISO/SUSv3 say that ctime is equivalent to the following. */
-	return asctime(localtime(t));
+	/* ANSI/ISO/SUSv3 say that ctime is equivalent to the following:
+	 * return asctime(localtime(t));
+	 * I don't think "equivalent" means "it uses the same internal buffer",
+	 * it means "gives the same resultant string".
+	 *
+	 * I doubt anyone ever uses weird code like:
+	 * struct tm *ptm = localtime(t1); ...; ctime(t2); use(ptm);
+	 * which relies on the assumption that ctime's and localtime's
+	 * internal static struct tm is the same.
+	 *
+	 * Using localtime_r instead of localtime avoids linking in
+	 * localtime's static buffer:
+	 */
+	struct tm xtm;
+	memset(&xtm, 0, sizeof(xtm));
+
+	return asctime(localtime_r(t, &xtm));
 }
 libc_hidden_def(ctime)
 #endif
@@ -618,43 +597,48 @@ libc_hidden_def(localtime_r)
 
 #ifdef __UCLIBC_HAS_TM_EXTENSIONS__
 
-/* Experimentally off - libc_hidden_proto(strnlen) */
-
 struct ll_tzname_item;
 
 typedef struct ll_tzname_item {
 	struct ll_tzname_item *next;
-	char tzname[TZNAME_MAX+1];
+	char tzname[1];
 } ll_tzname_item_t;
 
-static ll_tzname_item_t ll_tzname[] = {
-	{ ll_tzname + 1, "UTC" },	/* Always 1st. */
-	{ NULL, "???" }		  /* Always 2nd. (invalid or out-of-memory) */
-};
+/* Structures form a list "UTC" -> "???" -> "tzname1" -> "tzname2"... */
+struct {
+	struct ll_tzname_item *next;
+	char tzname[4];
+} ll_tzname_UNKNOWN = { NULL, "???" };
+const struct {
+	struct ll_tzname_item *next;
+	char tzname[4];
+} ll_tzname_UTC = { (void*)&ll_tzname_UNKNOWN, "UTC" };
 
 static const char *lookup_tzname(const char *key)
 {
-	ll_tzname_item_t *p;
+	int len;
+	ll_tzname_item_t *p = (void*) &ll_tzname_UTC;
 
-	for (p=ll_tzname ; p ; p=p->next) {
-		if (!strcmp(p->tzname, key)) {
+	do {
+		if (strcmp(p->tzname, key) == 0)
 			return p->tzname;
-		}
-	}
+		p = p->next;
+	} while (p != NULL);
 
 	/* Hmm... a new name. */
-	if (strnlen(key, TZNAME_MAX+1) < TZNAME_MAX+1) { /* Verify legal length */
-		if ((p = malloc(sizeof(ll_tzname_item_t))) != NULL) {
+	len = strnlen(key, TZNAME_MAX+1);
+	if (len < TZNAME_MAX+1) { /* Verify legal length */
+		p = malloc(sizeof(ll_tzname_item_t) + len);
+		if (p != NULL) {
 			/* Insert as 3rd item in the list. */
-			p->next = ll_tzname[1].next;
-			ll_tzname[1].next = p;
-			strcpy(p->tzname, key);
-			return p->tzname;
+			p->next = ll_tzname_UNKNOWN.next;
+			ll_tzname_UNKNOWN.next = p;
+			return strcpy(p->tzname, key);
 		}
 	}
 
 	/* Either invalid or couldn't alloc. */
-	return ll_tzname[1].tzname;
+	return ll_tzname_UNKNOWN.tzname;
 }
 
 #endif /* __UCLIBC_HAS_TM_EXTENSIONS__ */
@@ -809,17 +793,12 @@ time_t timegm(struct tm *timeptr)
 
 #if defined(__UCLIBC_HAS_XLOCALE__) && !defined(__UCLIBC_DO_XLOCALE)
 
-libc_hidden_proto(strftime)
-
-libc_hidden_proto(strftime_l)
-
 size_t strftime(char *__restrict s, size_t maxsize,
 				const char *__restrict format,
 				const struct tm *__restrict timeptr)
 {
 	return strftime_l(s, maxsize, format, timeptr, __UCLIBC_CURLOCALE);
 }
-libc_hidden_def(strftime)
 
 #else  /* defined(__UCLIBC_HAS_XLOCALE__) && !defined(__UCLIBC_DO_XLOCALE) */
 
@@ -1019,7 +998,6 @@ static int load_field(int k, const struct tm *__restrict timeptr)
 #warning TODO: Check multibyte format string validity.
 #endif
 
-libc_hidden_proto(__XL_NPP(strftime))
 size_t __XL_NPP(strftime)(char *__restrict s, size_t maxsize,
 					  const char *__restrict format,
 					  const struct tm *__restrict timeptr   __LOCALE_PARAM )
@@ -1033,7 +1011,7 @@ size_t __XL_NPP(strftime)(char *__restrict s, size_t maxsize,
 	const char *stack[MAX_PUSH];
 	size_t count;
 	size_t o_count;
-	int field_val, i, j, lvl;
+	int field_val = 0, i = 0, j, lvl;
 	int x[3];			/* wday, yday, year */
 	int isofm, days;
 	char buf[__UIM_BUFLEN_LONG];
@@ -1095,18 +1073,18 @@ LOOP:
 #ifdef ENABLE_ERA_CODE
 			if ((mod & NO_E_MOD) /* Actually, this means E modifier present. */
 				&& (*(o = __XL_NPP(nl_langinfo)(_NL_ITEM(LC_TIME,
-											 (int)(((unsigned char *)p)[4]))
-											__LOCALE_ARG
-									  )))
+							(int)(((unsigned char *)p)[4]))
+							__LOCALE_ARG
+							)))
 				) {
 				p = o;
 				goto LOOP;
 			}
 #endif
 			p = __XL_NPP(nl_langinfo)(_NL_ITEM(LC_TIME,
-									 (int)(*((unsigned char *)p)))
-								  __LOCALE_ARG
-								  );
+							(int)(*((unsigned char *)p)))
+							__LOCALE_ARG
+							);
 			goto LOOP;
 		}
 
@@ -1180,7 +1158,7 @@ LOOP:
 					 * tm_gmtoff value.  What we'll do instead is treat the
 					 * timezone name as unknown/invalid and return "???". */
 					if (!o) {
-							o = "???";
+						o = "???";
 					}
 #endif
 					assert(o != NULL);
@@ -1207,8 +1185,7 @@ LOOP:
 
 					i = 16 + 6;	/* 0-fill, width = 4 */
 				}
-#ifdef __UCLIBC_HAS_TM_EXTENSIONS__
-#else
+#ifndef __UCLIBC_HAS_TM_EXTENSIONS__
 				__UCLIBC_MUTEX_UNLOCK(_time_tzlock);
 				if (*p == 'Z') {
 					goto OUTPUT;
@@ -1234,7 +1211,7 @@ LOOP:
 						--field_val;
 					}
 				} else {	/* ((*p == 'g') || (*p == 'G') || (*p == 'V')) */
-				ISO_LOOP:
+ISO_LOOP:
 					isofm = (((x[1] - x[0]) + 11) % 7) - 3;	/* [-3,3] */
 
 					if (x[1] < isofm) {	/* belongs to previous year */
@@ -1245,7 +1222,7 @@ LOOP:
 
 					field_val = ((x[1] - isofm) / 7) + 1; /* week # */
 					days = 365 + __isleap(x[2]);
-					isofm = ((isofm + 7*53 + 3 - days)) %7 + days - 3; /* next year */
+					isofm = ((isofm + 7*53 + 3 - days)) % 7 + days - 3; /* next year */
 					if (x[1] >= isofm) { /* next year */
 						x[1] -= days;
 						++x[2];
@@ -1264,7 +1241,7 @@ LOOP:
 			}
 		} else {
 			i = TP_OFFSETS + (code & 0x1f);
-			if ((field_val = load_field(spec[i],timeptr)) < 0) {
+			if ((field_val = load_field(spec[i], timeptr)) < 0) {
 				goto OUTPUT;
 			}
 
@@ -1276,7 +1253,7 @@ LOOP:
 			}
 			if (i & 32) {
 				field_val %= j;
-				if (((i&128) + field_val) == 0) { /* mod 12? == 0 */
+				if (((i & 128) + field_val) == 0) { /* mod 12? == 0 */
 					field_val = j; /* set to 12 */
 				}
 			}
@@ -1289,7 +1266,7 @@ LOOP:
 		if ((code & MASK_SPEC) == STRING_SPEC) {
 			o_count = SIZE_MAX;
 			field_val += spec[STRINGS_NL_ITEM_START + (code & 0xf)];
-			o = __XL_NPP(nl_langinfo)(_NL_ITEM(LC_TIME, field_val)  __LOCALE_ARG );
+			o = __XL_NPP(nl_langinfo)(_NL_ITEM(LC_TIME, field_val)  __LOCALE_ARG);
 		} else {
 			o_count = ((i >> 1) & 3) + 1;
 			o = buf + o_count;
@@ -1312,7 +1289,9 @@ OUTPUT:
 	}
 	goto LOOP;
 }
-libc_hidden_def(__XL_NPP(strftime))
+# ifdef L_strftime_l
+libc_hidden_def(strftime_l)
+# endif
 
 #endif /* defined(__UCLIBC_HAS_XLOCALE__) && !defined(__UCLIBC_DO_XLOCALE) */
 
@@ -1330,16 +1309,11 @@ libc_hidden_def(__XL_NPP(strftime))
 
 #if defined(__UCLIBC_HAS_XLOCALE__) && !defined(__UCLIBC_DO_XLOCALE)
 
-libc_hidden_proto(strptime)
-
-libc_hidden_proto(strptime_l)
-
 char *strptime(const char *__restrict buf, const char *__restrict format,
 			   struct tm *__restrict tm)
 {
 	return strptime_l(buf, format, tm, __UCLIBC_CURLOCALE);
 }
-libc_hidden_def(strptime)
 
 #else  /* defined(__UCLIBC_HAS_XLOCALE__) && !defined(__UCLIBC_DO_XLOCALE) */
 
@@ -1485,7 +1459,6 @@ static const unsigned char spec[] = {
 
 #define MAX_PUSH 4
 
-libc_hidden_proto(__XL_NPP(strptime))
 char *__XL_NPP(strptime)(const char *__restrict buf, const char *__restrict format,
 					 struct tm *__restrict tm   __LOCALE_PARAM)
 {
@@ -1555,17 +1528,18 @@ LOOP:
 #ifdef ENABLE_ERA_CODE
 			if ((mod & NO_E_MOD) /* Actually, this means E modifier present. */
 				&& (*(o = __XL_NPP(nl_langinfo)(_NL_ITEM(LC_TIME,
-											  (int)(((unsigned char *)p)[4]))
-											__LOCALE_ARG
-											)))
+							(int)(((unsigned char *)p)[4]))
+							__LOCALE_ARG
+							)))
 				) {
 				p = o;
 				goto LOOP;
 			}
 #endif
 			p = __XL_NPP(nl_langinfo)(_NL_ITEM(LC_TIME,
-										   (int)(*((unsigned char *)p)))
-								  __LOCALE_ARG );
+							(int)(*((unsigned char *)p)))
+							__LOCALE_ARG
+							);
 			goto LOOP;
 		}
 
@@ -1579,7 +1553,7 @@ LOOP:
 			do {
 				--j;
 				o = __XL_NPP(nl_langinfo)(i+j   __LOCALE_ARG);
-				if (!__XL_NPP(strncasecmp)(buf,o,strlen(o)   __LOCALE_ARG) && *o) {
+				if (!__XL_NPP(strncasecmp)(buf, o, strlen(o)   __LOCALE_ARG) && *o) {
 					do {		/* Found a match. */
 						++buf;
 					} while (*++o);
@@ -1669,7 +1643,7 @@ LOOP:
 
 			fields[(*x) >> 3] = i;
 
-			if (((unsigned char)(*x - (10<< 3) + 0 + 0)) <= 8) { /* %C or %y */
+			if (((unsigned char)(*x - (10 << 3) + 0 + 0)) <= 8) { /* %C or %y */
 				if ((j = fields[10]) < 0) {	/* No %C, so i must be %y data. */
 					if (i <= 68) { /* Map [0-68] to 2000+i */
 						i += 100;
@@ -1695,7 +1669,9 @@ LOOP:
 	}
 	return NULL;
 }
-libc_hidden_def(__XL_NPP(strptime))
+# ifdef L_strptime_l
+libc_hidden_def(strptime_l)
+# endif
 
 #endif /* defined(__UCLIBC_HAS_XLOCALE__) && !defined(__UCLIBC_DO_XLOCALE) */
 
@@ -1825,53 +1801,100 @@ static const char *getnumber(register const char *e, int *pn)
 
 #ifndef __UCLIBC_HAS_TZ_FILE_READ_MANY__
 static smallint TZ_file_read;		/* Let BSS initialization set this to 0. */
-#endif /* __UCLIBC_HAS_TZ_FILE_READ_MANY__ */
+#endif
 
 static char *read_TZ_file(char *buf)
 {
+	int r;
 	int fd;
-	ssize_t r;
-	size_t todo;
 	char *p = NULL;
 
-	if ((fd = open(__UCLIBC_TZ_FILE_PATH__, O_RDONLY)) >= 0) {
-		todo = TZ_BUFLEN;
+	fd = open(__UCLIBC_TZ_FILE_PATH__, O_RDONLY);
+	if (fd >= 0) {
+#if 0
+		/* TZ are small *files*. On files, short reads
+		 * only occur on EOF (unlike, say, pipes).
+		 * The code below is pedanticallly more correct,
+		 * but this way we always read at least twice:
+		 * 1st read is short, 2nd one is zero bytes.
+		 */
+		size_t todo = TZ_BUFLEN;
 		p = buf;
 		do {
-			if ((r = read(fd, p, todo)) < 0) {
+			r = read(fd, p, todo);
+			if (r < 0)
 				goto ERROR;
-			}
-			if (r == 0) {
+			if (r == 0)
 				break;
-			}
 			p += r;
 			todo -= r;
 		} while (todo);
-
-		if ((p > buf) && (p[-1] == '\n')) {	/* Must end with newline. */
+#else
+		/* Shorter, and does one fewer read syscall */
+		r = read(fd, buf, TZ_BUFLEN);
+		if (r < 0)
+			goto ERROR;
+		p = buf + r;
+#endif
+		if ((p > buf) && (p[-1] == '\n')) { /* Must end with newline */
 			p[-1] = 0;
 			p = buf;
 #ifndef __UCLIBC_HAS_TZ_FILE_READ_MANY__
 			TZ_file_read = 1;
-#endif /* __UCLIBC_HAS_TZ_FILE_READ_MANY__ */
+#endif
 		} else {
 ERROR:
 			p = NULL;
 		}
 		close(fd);
 	}
+#ifdef __UCLIBC_FALLBACK_TO_ETC_LOCALTIME__
+	else {
+		fd = open("/etc/localtime", O_RDONLY);
+		if (fd >= 0) {
+			r = read(fd, buf, TZ_BUFLEN);
+			if (r != TZ_BUFLEN
+			 || strncmp(buf, "TZif", 4) != 0
+			 || (unsigned char)buf[4] < 2
+			 || lseek(fd, -TZ_BUFLEN, SEEK_END) < 0
+			) {
+				goto ERROR;
+			}
+			/* tzfile.h from tzcode database says about TZif2+ files:
+			**
+			** If tzh_version is '2' or greater, the above is followed by a second instance
+			** of tzhead and a second instance of the data in which each coded transition
+			** time uses 8 rather than 4 chars,
+			** then a POSIX-TZ-environment-variable-style string for use in handling
+			** instants after the last transition time stored in the file
+			** (with nothing between the newlines if there is no POSIX representation for
+			** such instants).
+			*/
+			r = read(fd, buf, TZ_BUFLEN);
+			if (r <= 0 || buf[--r] != '\n')
+				goto ERROR;
+			buf[r] = 0;
+			while (r != 0) {
+				if (buf[--r] == '\n') {
+					p = buf + r + 1;
+#ifndef __UCLIBC_HAS_TZ_FILE_READ_MANY__
+					TZ_file_read = 1;
+#endif
+					break;
+				}
+			} /* else ('\n' not found): p remains NULL */
+			close(fd);
+		}
+	}
+#endif /* __UCLIBC_FALLBACK_TO_ETC_LOCALTIME__ */
 	return p;
 }
 
 #endif /* __UCLIBC_HAS_TZ_FILE__ */
 
-#ifndef __UCLIBC_HAS_CTYPE_TABLES__
-libc_hidden_proto(isascii)
-#endif
-
 void tzset(void)
 {
-    _time_tzset((time(NULL)) < new_rule_starts);
+	_time_tzset((time(NULL)) < new_rule_starts);
 }
 
 void _time_tzset(int use_old_rules)
@@ -1885,43 +1908,41 @@ void _time_tzset(int use_old_rules)
 	char c;
 #ifdef __UCLIBC_HAS_TZ_FILE__
 	char buf[TZ_BUFLEN];
-#endif /* __UCLIBC_HAS_TZ_FILE__ */
+#endif
 #ifdef __UCLIBC_HAS_TZ_CACHING__
 	static char oldval[TZ_BUFLEN]; /* BSS-zero'd. */
-#endif /* __UCLIBC_HAS_TZ_CACHING__ */
+#endif
 
+	/* Put this inside the lock to prevent the possibility of two different
+	 * timezones being used in a threaded app. */
 	__UCLIBC_MUTEX_LOCK(_time_tzlock);
 
 	e = getenv(TZ);				/* TZ env var always takes precedence. */
 
 #if defined(__UCLIBC_HAS_TZ_FILE__) && !defined(__UCLIBC_HAS_TZ_FILE_READ_MANY__)
-	/* Put this inside the lock to prevent the possiblity of two different
-	 * timezones being used in a threaded app. */
-
-	if (e != NULL) {
-		TZ_file_read = 0;		/* Reset if the TZ env var is set. */
-	} else if (TZ_file_read) {
+	if (e) {
+		/* Never use TZfile if TZ env var is set. */
+		TZ_file_read = 0;
+	}
+	if (TZ_file_read) {
+		/* We already parsed TZfile before, skip everything. */
 		goto FAST_DONE;
 	}
-#endif /* defined(__UCLIBC_HAS_TZ_FILE__) && !defined(__UCLIBC_HAS_TZ_FILE_READ_MANY__) */
+#endif
 
 	/* Warning!!!  Since uClibc doesn't do lib locking, the following is
 	 * potentially unsafe in a multi-threaded program since it is remotely
 	 * possible that another thread could call setenv() for TZ and overwrite
 	 * the string being parsed.  So, don't do that... */
 
-	if ((!e						/* TZ env var not set... */
 #ifdef __UCLIBC_HAS_TZ_FILE__
-		 && !(e = read_TZ_file(buf)) /* and no file or invalid file */
-#endif /* __UCLIBC_HAS_TZ_FILE__ */
-		 ) || !*e) {			/* or set to empty string. */
-ILLEGAL:					/* TODO: Clean up the following... */
-#ifdef __UCLIBC_HAS_TZ_CACHING__
-		*oldval = 0;			/* Set oldval to an empty string. */
-#endif /* __UCLIBC_HAS_TZ_CACHING__ */
-		memset(_time_tzinfo, 0, 2*sizeof(rule_struct));
-		strcpy(_time_tzinfo[0].tzname, UTC);
-		goto DONE;
+	if (!e)
+		e = read_TZ_file(buf);
+#endif
+	if (!e		/* TZ env var not set and no TZfile (or bad TZfile) */
+	 || !*e		/* or set to empty string. */
+	) {
+		goto ILLEGAL;
 	}
 
 	if (*e == ':') {			/* Ignore leading ':'. */
@@ -1929,14 +1950,15 @@ ILLEGAL:					/* TODO: Clean up the following... */
 	}
 
 #ifdef __UCLIBC_HAS_TZ_CACHING__
-	if (strcmp(e, oldval) == 0) { /* Same string as last time... */
-		goto FAST_DONE;			/* So nothing to do. */
+	if (strcmp(e, oldval) == 0) {
+		/* Same string as last time... nothing to do. */
+		goto FAST_DONE;
 	}
 	/* Make a copy of the TZ env string.  It won't be nul-terminated if
 	 * it is too long, but it that case it will be illegal and will be reset
 	 * to the empty string anyway. */
 	strncpy(oldval, e, TZ_BUFLEN);
-#endif /* __UCLIBC_HAS_TZ_CACHING__ */
+#endif
 
 	count = 0;
 	new_rules[1].tzname[0] = 0;
@@ -1951,10 +1973,11 @@ LOOP:
 	s = new_rules[count].tzname;
 	n = 0;
 	while (*e
-		   && isascii(*e)		/* SUSv3 requires char in portable char set. */
-		   && (isalpha(*e)
-			   || (c && (isalnum(*e) || (*e == '+') || (*e == '-'))))
-		   ) {
+	    && isascii(*e)		/* SUSv3 requires char in portable char set. */
+	    && (isalpha(*e)
+		|| (c && (isalnum(*e) || (*e == '+') || (*e == '-')))
+	       )
+	) {
 		*s++ = *e++;
 		if (++n > TZNAME_MAX) {
 			goto ILLEGAL;
@@ -1963,8 +1986,8 @@ LOOP:
 	*s = 0;
 
 	if ((n < 3)					/* Check for minimum length. */
-		|| (c && (*e++ != c))	/* Match any quoting '<'. */
-		) {
+	 || (c && (*e++ != c))	/* Match any quoting '<'. */
+	) {
 		goto ILLEGAL;
 	}
 
@@ -1979,7 +2002,8 @@ LOOP:
 	}
 
 	++e;
-	if (!(e = getoffset(e, &off))) {
+	e = getoffset(e, &off);
+	if (!e) {
 		goto ILLEGAL;
 	}
 
@@ -1998,15 +2022,15 @@ SKIP_OFFSET:
 	} else {					/* OK, we have dst, so get some rules. */
 		count = 0;
 		if (!*e) {				/* No rules so default to US rules. */
-		        e = use_old_rules ? DEFAULT_RULES : DEFAULT_2007_RULES;
+			e = use_old_rules ? DEFAULT_RULES : DEFAULT_2007_RULES;
 #ifdef DEBUG_TZSET
 			if (e == DEFAULT_RULES)
-			    printf("tzset: Using old rules.\n");
+				printf("tzset: Using old rules.\n");
 			else if (e == DEFAULT_2007_RULES)
-			    printf("tzset: Using new rules\n");
+				printf("tzset: Using new rules\n");
 			else
-			    printf("tzset: Using undefined rules\n");
-#endif /* DEBUG_TZSET */
+				printf("tzset: Using undefined rules\n");
+#endif
 		}
 
 		do {
@@ -2016,7 +2040,8 @@ SKIP_OFFSET:
 
 			n = 365;
 			s = (char *) RULE;
-			if ((c = *e++) == 'M') {
+			c = *e++;
+			if (c == 'M') {
 				n = 12;
 			} else if (c == 'J') {
 				s += 8;
@@ -2026,26 +2051,31 @@ SKIP_OFFSET:
 				s += 6;
 			}
 
-			*(p = &new_rules[count].rule_type) = c;
+			p = &new_rules[count].rule_type;
+			*p = c;
 			if (c != 'M') {
 				p -= 2;
 			}
 
 			do {
 				++s;
-				if (!(e = getnumber(e, &f))
-					|| (((unsigned int)(f - s[1])) > n)
-					|| (*s && (*e++ != *s))
-					) {
+				e = getnumber(e, &f);
+				if (!e
+				 || ((unsigned int)(f - s[1]) > n)
+				 || (*s && (*e++ != *s))
+				) {
 					goto ILLEGAL;
 				}
 				*--p = f;
-			} while ((n = *(s += 2)) > 0);
+				s += 2;
+				n = *s;
+			} while (n > 0);
 
 			off = 2 * 60 * 60;	/* Default to 2:00:00 */
 			if (*e == '/') {
 				++e;
-				if (!(e = getoffset(e, &off))) {
+				e = getoffset(e, &off);
+				if (!e) {
 					goto ILLEGAL;
 				}
 			}
@@ -2053,7 +2083,13 @@ SKIP_OFFSET:
 		} while (++count < 2);
 
 		if (*e) {
-			goto ILLEGAL;
+ILLEGAL:
+#ifdef __UCLIBC_HAS_TZ_CACHING__
+			oldval[0] = 0; /* oldval = "" */
+#endif
+			memset(_time_tzinfo, 0, sizeof(_time_tzinfo));
+			strcpy(_time_tzinfo[0].tzname, UTC);
+			goto DONE;
 		}
 	}
 
@@ -2209,7 +2245,6 @@ struct tm attribute_hidden *_time_t2tm(const time_t *__restrict timer,
 		--p[-1];
 		t = 365;
 	}
-
 
 	*p += ((int) t);			/* result[7] .. tm_yday */
 
@@ -2386,7 +2421,7 @@ DST_CORRECT:
 	__time_localtime_tzi(&t, (struct tm *)p, tzi);
 
 	if (t == ((time_t)(-1))) {	/* Remember, time_t can be unsigned. */
-	    goto DONE;
+		goto DONE;
 	}
 
 	if ((d < 0) && (((struct tm *)p)->tm_isdst != default_dst)) {
@@ -2414,21 +2449,15 @@ DONE:
 
 #if defined(__UCLIBC_HAS_XLOCALE__) && !defined(__UCLIBC_DO_XLOCALE)
 
-libc_hidden_proto(wcsftime)
-
-libc_hidden_proto(wcsftime_l)
-
 size_t wcsftime(wchar_t *__restrict s, size_t maxsize,
 				const wchar_t *__restrict format,
 				const struct tm *__restrict timeptr)
 {
 	return wcsftime_l(s, maxsize, format, timeptr, __UCLIBC_CURLOCALE);
 }
-libc_hidden_def(wcsftime)
 
 #else  /* defined(__UCLIBC_HAS_XLOCALE__) && !defined(__UCLIBC_DO_XLOCALE) */
 
-libc_hidden_proto(__XL_NPP(wcsftime))
 size_t __XL_NPP(wcsftime)(wchar_t *__restrict s, size_t maxsize,
 					  const wchar_t *__restrict format,
 					  const struct tm *__restrict timeptr   __LOCALE_PARAM )
@@ -2436,7 +2465,9 @@ size_t __XL_NPP(wcsftime)(wchar_t *__restrict s, size_t maxsize,
 #warning wcsftime always fails
 	return 0;					/* always fail */
 }
-libc_hidden_def(__XL_NPP(wcsftime))
+#ifdef L_wcsftime_l
+libc_hidden_def(wcsftime_l)
+#endif
 
 #endif /* defined(__UCLIBC_HAS_XLOCALE__) && !defined(__UCLIBC_DO_XLOCALE) */
 

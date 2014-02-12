@@ -29,20 +29,8 @@
 #include <sys/statvfs.h>
 
 
-/* Experimentally off - libc_hidden_proto(memset) */
-/* Experimentally off - libc_hidden_proto(strcmp) */
-/* Experimentally off - libc_hidden_proto(strsep) */
-libc_hidden_proto(setmntent)
-libc_hidden_proto(getmntent_r)
-libc_hidden_proto(endmntent)
-
 #undef stat
 #define stat stat64
-#if defined __UCLIBC_LINUX_SPECIFIC__
-libc_hidden_proto(fstatfs64)
-libc_hidden_proto(fstat64)
-#endif
-libc_hidden_proto(stat64)
 
 int fstatvfs64 (int fd, struct statvfs64 *buf)
 {

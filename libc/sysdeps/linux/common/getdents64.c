@@ -5,7 +5,6 @@
  */
 
 #include <features.h>
-#include <alloca.h>
 #include <assert.h>
 #include <errno.h>
 #include <dirent.h>
@@ -17,11 +16,9 @@
 #include <sys/types.h>
 #include <sys/syscall.h>
 #include <bits/kernel_types.h>
+#include <bits/uClibc_alloc.h>
 
 #if defined __UCLIBC_HAS_LFS__ && defined __NR_getdents64
-
-/* Experimentally off - libc_hidden_proto(memcpy) */
-libc_hidden_proto(lseek64)
 
 # ifndef offsetof
 #  define offsetof(TYPE, MEMBER) ((size_t) &((TYPE *)0)->MEMBER)
@@ -35,7 +32,6 @@ struct kernel_dirent64
     unsigned char	d_type;
     char		d_name[256];
 };
-
 
 # define __NR___syscall_getdents64 __NR_getdents64
 static __inline__ _syscall3(int, __syscall_getdents64, int, fd, unsigned char *, dirp, size_t, count)
@@ -56,11 +52,13 @@ ssize_t __getdents64 (int fd, char *buf, size_t nbytes)
 	    nbytes - size_diff);
 
     dp = (struct dirent64 *) buf;
-    skdp = kdp = alloca (red_nbytes);
+    skdp = kdp = stack_heap_alloc(red_nbytes);
 
     retval = __syscall_getdents64(fd, (unsigned char *)kdp, red_nbytes);
-    if (retval == -1)
+    if (retval == -1) {
+	stack_heap_free(skdp);
 	return -1;
+    }
 
     while ((char *) kdp < (char *) skdp + retval) {
 	const size_t alignment = __alignof__ (struct dirent64);
@@ -77,6 +75,7 @@ ssize_t __getdents64 (int fd, char *buf, size_t nbytes)
 	    if ((char *) dp == buf) {
 		/* The buffer the user passed in is too small to hold even
 		   one entry.  */
+		stack_heap_free(skdp);
 		__set_errno (EINVAL);
 		return -1;
 	    }
@@ -93,6 +92,7 @@ ssize_t __getdents64 (int fd, char *buf, size_t nbytes)
 	dp = (struct dirent64 *) ((char *) dp + new_reclen);
 	kdp = (struct kernel_dirent64 *) (((char *) kdp) + kdp->d_reclen);
     }
+    stack_heap_free(skdp);
     return (char *) dp - buf;
 }
 
@@ -102,4 +102,4 @@ ssize_t __getdents64 (int fd, char *buf, size_t nbytes)
 attribute_hidden strong_alias(__getdents64,__getdents)
 #endif
 
-#endif /* __UCLIBC_HAS_LFS__ */
+#endif

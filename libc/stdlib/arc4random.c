@@ -35,13 +35,8 @@
 #include <sys/time.h>
 #ifdef __ARC4RANDOM_USE_ERANDOM__
 #include <sys/sysctl.h>
-//libc_hidden_proto(sysctl)
 #endif
 
-libc_hidden_proto(open)
-libc_hidden_proto(read)
-libc_hidden_proto(close)
-libc_hidden_proto(gettimeofday)
 
 struct arc4_stream {
 	uint8_t i;
@@ -59,8 +54,7 @@ static __inline__ uint8_t arc4_getbyte(struct arc4_stream *);
 static __inline__ uint32_t arc4_getword(struct arc4_stream *);
 
 static __inline__ void
-arc4_init(as)
-	struct arc4_stream *as;
+arc4_init(struct arc4_stream *as)
 {
 	int     n;
 
@@ -71,10 +65,7 @@ arc4_init(as)
 }
 
 static __inline__ void
-arc4_addrandom(as, dat, datlen)
-	struct arc4_stream *as;
-	u_char *dat;
-	int     datlen;
+arc4_addrandom(struct arc4_stream *as, u_char *dat, int datlen)
 {
 	int     n;
 	uint8_t si;
@@ -91,8 +82,7 @@ arc4_addrandom(as, dat, datlen)
 }
 
 static void
-arc4_stir(as)
-	struct arc4_stream *as;
+arc4_stir(struct arc4_stream *as)
 {
 	int     fd;
 	struct {
@@ -142,8 +132,7 @@ arc4_stir(as)
 }
 
 static __inline__ uint8_t
-arc4_getbyte(as)
-	struct arc4_stream *as;
+arc4_getbyte(struct arc4_stream *as)
 {
 	uint8_t si, sj;
 
@@ -157,8 +146,7 @@ arc4_getbyte(as)
 }
 
 static __inline__ uint32_t
-arc4_getword(as)
-	struct arc4_stream *as;
+arc4_getword(struct arc4_stream *as)
 {
 	uint32_t val;
 	val = arc4_getbyte(as) << 24;
@@ -168,9 +156,8 @@ arc4_getword(as)
 	return val;
 }
 
-libc_hidden_proto(arc4random_stir)
-void
-arc4random_stir(void)
+static void
+__arc4random_stir(void)
 {
 	if (!rs_initialized) {
 		arc4_init(&rs);
@@ -178,13 +165,13 @@ arc4random_stir(void)
 	}
 	arc4_stir(&rs);
 }
-libc_hidden_def(arc4random_stir)
+strong_alias(__arc4random_stir,arc4random_stir)
 
 void
 arc4random_addrandom(u_char *dat, int datlen)
 {
 	if (!rs_initialized)
-		arc4random_stir();
+		__arc4random_stir();
 	arc4_addrandom(&rs, dat, datlen);
 }
 
@@ -192,7 +179,7 @@ uint32_t
 arc4random(void)
 {
 	if (!rs_initialized)
-		arc4random_stir();
+		__arc4random_stir();
 	return arc4_getword(&rs);
 }
 

@@ -1,10 +1,6 @@
 #ifndef _BITS_STAT_STRUCT_H
 #define _BITS_STAT_STRUCT_H
 
-#ifndef _LIBC
-#error bits/kernel_stat.h is for internal uClibc use only!
-#endif
-
 /* This file provides whatever this particular arch's kernel thinks
  * struct kernel_stat should look like...  It turns out each arch has a
  * different opinion on the subject... */
@@ -16,7 +12,7 @@ struct kernel_stat {
 #else
 	unsigned long  st_dev;
 #endif
-	unsigned long st_ino;
+	unsigned long  st_ino;
 	unsigned short st_mode;
 	unsigned short st_nlink;
 	unsigned short st_uid;

@@ -17,10 +17,6 @@
 #include <sys/mman.h>
 #include <malloc.h>
 
-/* Experimentally off - libc_hidden_proto(memcpy) */
-/*libc_hidden_proto(memset)*/
-libc_hidden_proto(mmap)
-libc_hidden_proto(munmap)
 
 #ifdef L_malloc
 void *malloc(size_t size)
@@ -40,7 +36,7 @@ void *malloc(size_t size)
 #ifdef __ARCH_USE_MMU__
 # define MMAP_FLAGS MAP_PRIVATE | MAP_ANONYMOUS
 #else
-# define MMAP_FLAGS MAP_SHARED | MAP_ANONYMOUS
+# define MMAP_FLAGS MAP_SHARED | MAP_ANONYMOUS | MAP_UNINITIALIZE
 #endif
 
 	result = mmap((void *) 0, size + sizeof(size_t), PROT_READ | PROT_WRITE,
@@ -64,11 +60,10 @@ void * calloc(size_t nmemb, size_t lsize)
 		__set_errno(ENOMEM);
 		return NULL;
 	}
-	result=malloc(size);
-#if 0
-	/* Standard unix mmap using /dev/zero clears memory so calloc
-	 * doesn't need to actually zero anything....
-	 */
+	result = malloc(size);
+
+#ifndef __ARCH_USE_MMU__
+	/* mmap'd with MAP_UNINITIALIZE, we have to blank memory ourselves */
 	if (result != NULL) {
 		memset(result, 0, size);
 	}

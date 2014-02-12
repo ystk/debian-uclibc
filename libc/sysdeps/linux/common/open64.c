@@ -7,6 +7,10 @@
 #include <features.h>
 #include <fcntl.h>
 #include <stdarg.h>
+#ifdef __UCLIBC_HAS_THREADS_NATIVE__
+#include <errno.h>
+#include <sysdep-cancel.h>
+#endif
 
 #ifdef __UCLIBC_HAS_LFS__
 
@@ -14,14 +18,9 @@
 # define O_LARGEFILE	0100000
 #endif
 
-extern __typeof(open64) __libc_open64;
-extern __typeof(open) __libc_open;
-libc_hidden_proto(__libc_open)
-
 /* Open FILE with access OFLAG.  If OFLAG includes O_CREAT,
    a third argument is the file protection.  */
-libc_hidden_proto(__libc_open64)
-int __libc_open64 (const char *file, int oflag, ...)
+int open64 (const char *file, int oflag, ...)
 {
     mode_t mode = 0;
 
@@ -33,11 +32,26 @@ int __libc_open64 (const char *file, int oflag, ...)
 	va_end (arg);
     }
 
-    return __libc_open(file, oflag | O_LARGEFILE, mode);
-}
-libc_hidden_def(__libc_open64)
+#ifdef __UCLIBC_HAS_THREADS_NATIVE__
+  if (SINGLE_THREAD_P)
+    return INLINE_SYSCALL (open, 3, file, oflag | O_LARGEFILE, mode);
 
-libc_hidden_proto(open64)
-weak_alias(__libc_open64,open64)
+  int oldtype = LIBC_CANCEL_ASYNC ();
+
+  int result = INLINE_SYSCALL (open, 3, file, oflag | O_LARGEFILE, mode);
+
+  LIBC_CANCEL_RESET (oldtype);
+
+  return result;
+#else
+  return open(file, oflag | O_LARGEFILE, mode);
+#endif
+}
+#ifndef __LINUXTHREADS_OLD__
+libc_hidden_def(open64)
+#else
 libc_hidden_weak(open64)
+strong_alias(open64,__libc_open64)
+#endif
+
 #endif /* __UCLIBC_HAS_LFS__ */

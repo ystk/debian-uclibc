@@ -32,20 +32,12 @@
 #include <sys/socket.h>
 #include <sys/ioctl.h>
 #include <libc-internal.h>
+#include <not-cancel.h>
 
 #include "netlinkaccess.h"
 
-/* Experimentally off - libc_hidden_proto(strncpy) */
-/* Experimentally off - libc_hidden_proto(strdup) */
-libc_hidden_proto(ioctl)
-libc_hidden_proto(close)
-#if __ASSUME_NETLINK_SUPPORT
-/* Experimentally off - libc_hidden_proto(strndup) */
-#endif
-
 extern int __opensock(void) attribute_hidden;
 
-libc_hidden_proto(if_nametoindex)
 unsigned int
 if_nametoindex(const char* ifname)
 {
@@ -62,20 +54,20 @@ if_nametoindex(const char* ifname)
   strncpy (ifr.ifr_name, ifname, sizeof (ifr.ifr_name));
   if (ioctl (fd, SIOCGIFINDEX, &ifr) < 0)
     {
-      int saved_errno = errno;
-      close(fd);
-      if (saved_errno == EINVAL)
-	__set_errno(ENOSYS);
+      /* close never fails here, fd is just a unconnected socket.
+       *int saved_errno = errno; */
+      close_not_cancel_no_status(fd);
+      /*if (saved_errno == EINVAL)
+       *  __set_errno(ENOSYS); */
       return 0;
     }
 
-  close(fd);
+  close_not_cancel_no_status(fd);
   return ifr.ifr_ifindex;
 #endif
 }
 libc_hidden_def(if_nametoindex)
 
-libc_hidden_proto(if_freenameindex)
 void
 if_freenameindex (struct if_nameindex *ifn)
 {
@@ -89,7 +81,6 @@ if_freenameindex (struct if_nameindex *ifn)
 }
 libc_hidden_def(if_freenameindex)
 
-libc_hidden_proto(if_nameindex)
 #if !__ASSUME_NETLINK_SUPPORT
 struct if_nameindex *
 if_nameindex (void)
@@ -122,7 +113,7 @@ if_nameindex (void)
 
       if (ioctl (fd, SIOCGIFCONF, &ifc) < 0)
 	{
-	  close (fd);
+	  close_not_cancel_no_status (fd);
 	  return NULL;
 	}
     }
@@ -133,7 +124,7 @@ if_nameindex (void)
   idx = malloc ((nifs + 1) * sizeof (struct if_nameindex));
   if (idx == NULL)
     {
-      close(fd);
+      close_not_cancel_no_status (fd);
       __set_errno(ENOBUFS);
       return NULL;
     }
@@ -151,7 +142,7 @@ if_nameindex (void)
 	  for (j =  0; j < i; ++j)
 	    free (idx[j].if_name);
 	  free(idx);
-	  close(fd);
+	  close_not_cancel_no_status (fd);
 	  if (saved_errno == EINVAL)
 	    saved_errno = ENOSYS;
 	  else if (saved_errno == ENOMEM)
@@ -165,7 +156,7 @@ if_nameindex (void)
   idx[i].if_index = 0;
   idx[i].if_name = NULL;
 
-  close(fd);
+  close_not_cancel_no_status (fd);
   return idx;
 #endif
 }
@@ -308,14 +299,14 @@ if_indextoname (unsigned int ifindex, char *ifname)
   if (ioctl (fd, SIOCGIFNAME, &ifr) < 0)
     {
       int serrno = errno;
-      close (fd);
+      close_not_cancel_no_status (fd);
       if (serrno == ENODEV)
 	/* POSIX requires ENXIO.  */
 	serrno = ENXIO;
       __set_errno (serrno);
       return NULL;
   }
-  close (fd);
+  close_not_cancel_no_status (fd);
 
   return strncpy (ifname, ifr.ifr_name, IFNAMSIZ);
 # else

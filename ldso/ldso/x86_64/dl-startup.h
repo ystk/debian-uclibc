@@ -35,7 +35,7 @@ __asm__ (
 );
 
 /* Get a pointer to the argv array.  On many platforms this can be just
- * the address if the first argument, on other platforms we need to
+ * the address of the first argument, on other platforms we need to
  * do something a little more subtle here.  */
 #define GET_ARGV(ARGVP, ARGS) ARGVP = (((unsigned long*) ARGS)+1)
 
@@ -58,6 +58,9 @@ void PERFORM_BOOTSTRAP_RELOC(ELF_RELOC *rpnt, ElfW(Addr) *reloc_addr,
 		case R_X86_64_TPOFF64:
 			*reloc_addr = sym->st_value + rpnt->r_addend - symbol_addr;
 			break;
+/*TODO:		case R_X86_64_RELATIVE:
+			*reloc_addr = load_addr + rpnt->r_addend;
+			break; */
 		default:
 			_dl_exit(1);
 	}

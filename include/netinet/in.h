@@ -1,4 +1,4 @@
-/* Copyright (C) 1991-2001, 2003, 2004, 2006, 2007
+/* Copyright (C) 1991-2001, 2003, 2004, 2006, 2007, 2008
    Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
@@ -53,6 +53,8 @@ enum
 #define IPPROTO_IDP		IPPROTO_IDP
     IPPROTO_TP = 29,	   /* SO Transport Protocol Class 4.  */
 #define IPPROTO_TP		IPPROTO_TP
+    IPPROTO_DCCP = 33,	   /* Datagram Congestion Control Protocol.  */
+#define IPPROTO_DCCP		IPPROTO_DCCP
     IPPROTO_IPV6 = 41,     /* IPv6 header.  */
 #define IPPROTO_IPV6		IPPROTO_IPV6
     IPPROTO_ROUTING = 43,  /* IPv6 routing header.  */
@@ -83,6 +85,8 @@ enum
 #define IPPROTO_COMP		IPPROTO_COMP
     IPPROTO_SCTP = 132,	   /* Stream Control Transmission Protocol.  */
 #define IPPROTO_SCTP		IPPROTO_SCTP
+    IPPROTO_UDPLITE = 136, /* UDP-Lite protocol.  */
+#define IPPROTO_UDPLITE		IPPROTO_UDPLITE
     IPPROTO_RAW = 255,	   /* Raw IP packets.  */
 #define IPPROTO_RAW		IPPROTO_RAW
     IPPROTO_MAX
@@ -190,33 +194,41 @@ struct in_addr
 #define INADDR_MAX_LOCAL_GROUP  ((in_addr_t) 0xe00000ff) /* 224.0.0.255 */
 
 
+#if defined __UCLIBC_HAS_IPV6__ || !defined __UCLIBC_STRICT_HEADERS__
 /* IPv6 address */
 struct in6_addr
   {
     union
       {
-	uint8_t	u6_addr8[16];
-	uint16_t u6_addr16[8];
-	uint32_t u6_addr32[4];
-      } in6_u;
-#define s6_addr			in6_u.u6_addr8
-#define s6_addr16		in6_u.u6_addr16
-#define s6_addr32		in6_u.u6_addr32
+	uint8_t	__u6_addr8[16];
+#if defined __USE_MISC || defined __USE_GNU
+	uint16_t __u6_addr16[8];
+	uint32_t __u6_addr32[4];
+#endif
+      } __in6_u;
+#define s6_addr			__in6_u.__u6_addr8
+#if defined __USE_MISC || defined __USE_GNU
+# define s6_addr16		__in6_u.__u6_addr16
+# define s6_addr32		__in6_u.__u6_addr32
+#endif
   };
 
-extern const struct in6_addr in6addr_any;        /* :: */
-extern const struct in6_addr in6addr_loopback;   /* ::1 */
 #define IN6ADDR_ANY_INIT { { { 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 } } }
 #define IN6ADDR_LOOPBACK_INIT { { { 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1 } } }
 
-#define INET_ADDRSTRLEN 16
 #define INET6_ADDRSTRLEN 46
+#endif
 
-/* Get the definition of the macro to define the common sockaddr members.  */
-#include <bits/socket.h>
+#ifdef __UCLIBC_HAS_IPV6__
+extern const struct in6_addr in6addr_any;        /* :: */
+extern const struct in6_addr in6addr_loopback;   /* ::1 */
+libc_hidden_proto(in6addr_loopback)
+#endif
+
+#define INET_ADDRSTRLEN 16
 
 
-#if 1 /* defined __UCLIBC_HAS_IPV4__ */
+#if 1 /*def __UCLIBC_HAS_IPV4__*/
 /* Structure describing an Internet socket address.  */
 struct sockaddr_in
   {
@@ -232,6 +244,7 @@ struct sockaddr_in
   };
 #endif
 
+#if defined __UCLIBC_HAS_IPV6__ || !defined __UCLIBC_STRICT_HEADERS__
 /* Ditto, for IPv6.  */
 struct sockaddr_in6
   {
@@ -241,8 +254,10 @@ struct sockaddr_in6
     struct in6_addr sin6_addr;	/* IPv6 address */
     uint32_t sin6_scope_id;	/* IPv6 scope-id */
   };
+#endif
 
 
+#if defined __USE_MISC || defined __USE_GNU
 /* IPv4 multicast request.  */
 struct ip_mreq
   {
@@ -264,7 +279,10 @@ struct ip_mreq_source
     /* IP address of interface.  */
     struct in_addr imr_sourceaddr;
   };
+#endif
 
+
+#if defined __UCLIBC_HAS_IPV6__ || !defined __UCLIBC_STRICT_HEADERS__
 /* Likewise, for IPv6.  */
 struct ipv6_mreq
   {
@@ -274,8 +292,10 @@ struct ipv6_mreq
     /* local interface */
     unsigned int ipv6mr_interface;
   };
+#endif
 
 
+#if defined __USE_MISC || defined __USE_GNU
 /* Multicast group request.  */
 struct group_req
   {
@@ -342,6 +362,7 @@ struct group_filter
 				   - sizeof (struct sockaddr_storage)	      \
 				   + ((numsrc)				      \
 				      * sizeof (struct sockaddr_storage)))
+#endif
 
 
 /* Get system-specific definitions.  */
@@ -355,12 +376,16 @@ struct group_filter
    may have different representations but the values are always the same.  */
 
 extern uint32_t ntohl (uint32_t __netlong) __THROW __attribute__ ((__const__));
+libc_hidden_proto(ntohl)
 extern uint16_t ntohs (uint16_t __netshort)
      __THROW __attribute__ ((__const__));
+libc_hidden_proto(ntohs)
 extern uint32_t htonl (uint32_t __hostlong)
      __THROW __attribute__ ((__const__));
+libc_hidden_proto(htonl)
 extern uint16_t htons (uint16_t __hostshort)
      __THROW __attribute__ ((__const__));
+libc_hidden_proto(htons)
 
 #include <endian.h>
 
@@ -388,6 +413,7 @@ extern uint16_t htons (uint16_t __hostshort)
 # endif
 #endif
 
+#if defined __UCLIBC_HAS_IPV6__ || !defined __UCLIBC_STRICT_HEADERS__
 #define IN6_IS_ADDR_UNSPECIFIED(a) \
 	(((__const uint32_t *) (a))[0] == 0				      \
 	 && ((__const uint32_t *) (a))[1] == 0				      \
@@ -426,15 +452,22 @@ extern uint16_t htons (uint16_t __hostshort)
 	 && (((__const uint32_t *) (a))[1] == ((__const uint32_t *) (b))[1])  \
 	 && (((__const uint32_t *) (a))[2] == ((__const uint32_t *) (b))[2])  \
 	 && (((__const uint32_t *) (a))[3] == ((__const uint32_t *) (b))[3]))
+#endif
 
+#if defined __USE_MISC || defined __USE_GNU
 /* Bind socket to a privileged IP port.  */
 extern int bindresvport (int __sockfd, struct sockaddr_in *__sock_in) __THROW;
+libc_hidden_proto(bindresvport)
 
+# if 0 /*def __UCLIBC_HAS_IPV6__*/
 /* The IPv6 version of this function.  */
 extern int bindresvport6 (int __sockfd, struct sockaddr_in6 *__sock_in)
      __THROW;
+# endif
+#endif
 
 
+#if defined __UCLIBC_HAS_IPV6__ || !defined __UCLIBC_STRICT_HEADERS__
 #define IN6_IS_ADDR_MC_NODELOCAL(a) \
 	(IN6_IS_ADDR_MULTICAST(a)					      \
 	 && ((((__const uint8_t *) (a))[1] & 0xf) == 0x1))
@@ -454,7 +487,11 @@ extern int bindresvport6 (int __sockfd, struct sockaddr_in6 *__sock_in)
 #define IN6_IS_ADDR_MC_GLOBAL(a) \
 	(IN6_IS_ADDR_MULTICAST(a)					      \
 	 && ((((__const uint8_t *) (a))[1] & 0xf) == 0xe))
+#endif
 
+
+#ifdef __USE_GNU
+# if defined __UCLIBC_HAS_IPV6__ || !defined __UCLIBC_STRICT_HEADERS__
 /* IPv6 packet information.  */
 struct in6_pktinfo
   {
@@ -470,7 +507,7 @@ struct ip6_mtuinfo
   };
 
 
-#if 0 /*def __USE_GNU*/
+#  if 0
 /* Obsolete hop-by-hop and Destination Options Processing (RFC 2292).  */
 extern int inet6_option_space (int __nbytes)
      __THROW __attribute_deprecated__;
@@ -518,8 +555,11 @@ extern int inet6_rth_reverse (__const void *__in, void *__out) __THROW;
 extern int inet6_rth_segments (__const void *__bp) __THROW;
 extern struct in6_addr *inet6_rth_getaddr (__const void *__bp, int __index)
      __THROW;
+#  endif
+# endif
 
 
+# if 0
 /* Multicast source filter support.  */
 
 /* Get IPv4 source filter.  */
@@ -549,6 +589,7 @@ extern int setsourcefilter (int __s, uint32_t __interface_addr,
 			    socklen_t __grouplen, uint32_t __fmode,
 			    uint32_t __numsrc,
 			    __const struct sockaddr_storage *__slist) __THROW;
+# endif
 #endif	/* use GNU */
 
 __END_DECLS

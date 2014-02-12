@@ -1,4 +1,5 @@
-/* Copyright (C) 1991, 93, 95, 96, 97, 2000 Free Software Foundation, Inc.
+/* Copyright (C) 1991,1993,1995-1997,2000
+   Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -33,11 +34,84 @@
 #ifdef __UCLIBC_HAS_REGEX__
 #include <regex.h>
 #endif
+#ifdef __UCLIBC_HAS_THREADS_NATIVE__
+#include <sysdep.h>
+#include <sys/resource.h>
 
-libc_hidden_proto(sysconf)
+#endif
+#include <string.h>
+#include <dirent.h>
+#include "internal/parse_config.h"
 
-libc_hidden_proto(getpagesize)
-libc_hidden_proto(getdtablesize)
+static int nprocessors_onln(void)
+{
+	char **l = NULL;
+	parser_t *p = config_open("/proc/stat");
+	int ret = 0;
+
+	if (p) {
+		while (config_read(p, &l, 2, 1, " ", 0))
+			if (l[0][0] == 'c'
+				&& l[0][1] == 'p'
+				&& l[0][2] == 'u'
+				&& isdigit(l[0][3]))
+				++ret;
+	} else if ((p = config_open("/proc/cpuinfo"))) {
+#if defined __sparc__
+		while (config_read(p, &l, 2, 2, "\0:", PARSE_NORMAL))
+			if (strncmp("ncpus active", l[0], 12) == 0) {
+				ret = atoi(l[1]);
+				break;
+			}
+#else
+		while (config_read(p, &l, 2, 2, "\0:\t", PARSE_NORMAL))
+			if (strcmp("processor", l[0]) == 0)
+				++ret;
+#endif
+	}
+	config_close(p);
+	return ret != 0 ? ret : 1;
+}
+
+#if defined __UCLIBC__ && !defined __UCLIBC_HAS_LFS__
+# define readdir64 readdir
+# define dirent64 dirent
+#endif
+static int nprocessors_conf(void)
+{
+	int ret = 0;
+	DIR *dir = opendir("/sys/devices/system/cpu");
+
+	if (dir) {
+		struct dirent64 *dp;
+
+		while ((dp = readdir64(dir))) {
+			if (dp->d_type == DT_DIR
+				&& dp->d_name[0] == 'c'
+				&& dp->d_name[1] == 'p'
+				&& dp->d_name[2] == 'u'
+				&& isdigit(dp->d_name[3]))
+				++ret;
+		}
+		closedir(dir);
+	} else
+	{
+#if defined __sparc__
+		char **l = NULL;
+		parser_t *p = config_open("/proc/stat");
+		while (config_read(p, &l, 2, 2, "\0:", PARSE_NORMAL))
+			if (strncmp("ncpus probed", l[0], 13) == 0) {
+				ret = atoi(l[1]);
+				break;
+			}
+		config_close(p);
+#else
+		ret = nprocessors_onln();
+#endif
+	}
+	return ret != 0 ? ret : 1;
+}
+
 
 #ifndef __UCLIBC_CLK_TCK_CONST
 #error __UCLIBC_CLK_TCK_CONST not defined!
@@ -73,9 +147,16 @@ libc_hidden_proto(getdtablesize)
 #define RETURN_FUNCTION(f) return f;
 #endif /* _UCLIBC_GENERATE_SYSCONF_ARCH */
 
+/* Legacy value of ARG_MAX.  The macro is now not defined since the
+   actual value varies based on the stack size.  */
+#define legacy_ARG_MAX 131072
+
 /* Get the value of the system variable NAME.  */
 long int sysconf(int name)
 {
+#ifdef __UCLIBC_HAS_THREADS_NATIVE__
+      struct rlimit rlimit;
+#endif
   switch (name)
     {
     default:
@@ -83,7 +164,11 @@ long int sysconf(int name)
       return -1;
 
     case _SC_ARG_MAX:
-#ifdef	ARG_MAX
+#ifdef __UCLIBC_HAS_THREADS_NATIVE__
+      /* Use getrlimit to get the stack limit.  */
+      if (getrlimit (RLIMIT_STACK, &rlimit) == 0)
+          return MAX (legacy_ARG_MAX, rlimit.rlim_cur / 4);
+#elif defined ARG_MAX
       return ARG_MAX;
 #else
       RETURN_NEG_1;
@@ -658,20 +743,10 @@ long int sysconf(int name)
 #endif
 
     case _SC_NPROCESSORS_CONF:
-#if 0
-      RETURN_FUNCTION(get_nprocs_conf());
-#else
-      /* this is a hack.  for now always claim we have exactly one cpu */
-      return 1;
-#endif
+      RETURN_FUNCTION(nprocessors_conf());
 
     case _SC_NPROCESSORS_ONLN:
-#if 0
-      RETURN_FUNCTION(get_nprocs());
-#else
-      /* this is a hack.  for now always claim we have exactly one cpu */
-      return 1;
-#endif
+      RETURN_FUNCTION(nprocessors_onln());
 
     case _SC_PHYS_PAGES:
 #if 0
@@ -866,6 +941,30 @@ long int sysconf(int name)
 #else
       RETURN_NEG_1;
 #endif
+    case _SC_V7_ILP32_OFF32:
+#ifdef _POSIX_V7_ILP32_OFF32
+      return _POSIX_V7_ILP32_OFF32;
+#else
+      RETURN_NEG_1;
+#endif
+    case _SC_V7_ILP32_OFFBIG:
+#ifdef _POSIX_V7_ILP32_OFFBIG
+      return _POSIX_V7_ILP32_OFFBIG;
+#else
+      RETURN_NEG_1;
+#endif
+    case _SC_V7_LP64_OFF64:
+#ifdef _POSIX_V7_LP64_OFF64
+      return _POSIX_V7_LP64_OFF64;
+#else
+      RETURN_NEG_1;
+#endif
+    case _SC_V7_LPBIG_OFFBIG:
+#ifdef _POSIX_V7_LPBIG_OFFBIG
+      return _POSIX_V7_LPBIG_OFFBIG;
+#else
+      RETURN_NEG_1;
+#endif
 
     case _SC_XOPEN_LEGACY:
       return _XOPEN_LEGACY;
@@ -884,13 +983,31 @@ long int sysconf(int name)
 #endif
 
     case _SC_MONOTONIC_CLOCK:
-#if defined __UCLIBC_HAS_REALTIME__ && defined __NR_clock_getres
-      /* Check using the clock_getres system call.  */
+#ifdef __NR_clock_getres
+    /* Check using the clock_getres system call.  */
+# ifdef __UCLIBC_HAS_THREADS_NATIVE__
+    {
+      struct timespec ts;
+      INTERNAL_SYSCALL_DECL (err);
+      int r;
+      r = INTERNAL_SYSCALL (clock_getres, err, 2, CLOCK_MONOTONIC, &ts);
+      return INTERNAL_SYSCALL_ERROR_P (r, err) ? -1 : _POSIX_VERSION;
+    }
+# elif defined __UCLIBC_HAS_REALTIME__
       if (clock_getres(CLOCK_MONOTONIC, NULL) >= 0)
         return _POSIX_VERSION;
+# endif
 #endif
-
       RETURN_NEG_1;
+
+#ifdef __UCLIBC_HAS_THREADS_NATIVE__
+    case _SC_THREAD_CPUTIME:
+# if _POSIX_THREAD_CPUTIME > 0
+      return _POSIX_THREAD_CPUTIME;
+# else
+      RETURN_NEG_1;
+# endif
+#endif
     }
 }
 libc_hidden_def(sysconf)

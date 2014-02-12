@@ -27,17 +27,26 @@
 /* Pull in compiler and arch stuff */
 #include <stdlib.h>
 #include <stdarg.h>
+#define _FCNTL_H
+#include <bits/fcntl.h>
 #include <bits/wordsize.h>
 /* Pull in the arch specific type information */
 #include <sys/types.h>
 /* Pull in the arch specific page size */
 #include <bits/uClibc_page.h>
+/* Pull in the MIN macro */
+#include <sys/param.h>
 /* Pull in the ldso syscalls and string functions */
 #ifndef __ARCH_HAS_NO_SHARED__
 #include <dl-syscall.h>
 #include <dl-string.h>
+#include <dlfcn.h>
 /* Now the ldso specific headers */
 #include <dl-elf.h>
+#ifdef __UCLIBC_HAS_TLS__
+/* Defines USE_TLS */
+#include <tls.h>
+#endif
 #include <dl-hash.h>
 
 /* common align masks, if not specified by sysdep headers */
@@ -64,9 +73,17 @@ extern char *_dl_library_path;         /* Where we look for libraries */
 extern char *_dl_preload;              /* Things to be loaded before the libs */
 extern char *_dl_ldsopath;             /* Where the shared lib loader was found */
 extern const char *_dl_progname;       /* The name of the executable being run */
-extern int _dl_secure;                 /* Are we dealing with setuid stuff? */
 extern size_t _dl_pagesize;            /* Store the page size for use later */
 
+#if defined(USE_TLS) && USE_TLS
+extern void _dl_add_to_slotinfo (struct link_map  *l);
+extern void ** __attribute__ ((const)) _dl_initial_error_catch_tsd (void);
+#endif
+
+#ifdef USE_TLS
+void _dl_add_to_slotinfo (struct link_map  *l);
+void ** __attribute__ ((const)) _dl_initial_error_catch_tsd (void);
+#endif
 #ifdef __SUPPORT_LD_DEBUG__
 extern char *_dl_debug;
 extern char *_dl_debug_symbols;
@@ -114,6 +131,8 @@ extern int   _dl_debug_file;
 #endif
 
 extern void *_dl_malloc(size_t size);
+extern void *_dl_calloc(size_t __nmemb, size_t __size);
+extern void *_dl_realloc(void *__ptr, size_t __size);
 extern void _dl_free(void *);
 extern char *_dl_getenv(const char *symbol, char **envp);
 extern void _dl_unsetenv(const char *symbol, char **envp);

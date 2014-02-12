@@ -5,6 +5,8 @@
 # Licensed under the LGPL v2.1, see the file COPYING.LIB in this tarball.
 #
 
+subdirs += libc/misc/ftw
+
 CSRC := ftw.c
 ifeq ($(UCLIBC_HAS_LFS),y)
 CSRC += ftw64.c
@@ -16,9 +18,9 @@ MISC_FTW_OUT := $(top_builddir)libc/misc/ftw
 MISC_FTW_SRC := $(patsubst %.c,$(MISC_FTW_DIR)/%.c,$(CSRC))
 MISC_FTW_OBJ := $(patsubst %.c,$(MISC_FTW_OUT)/%.o,$(CSRC))
 
-libc-$(UCLIBC_HAS_FTW) += $(MISC_FTW_OBJ)
+libc-$(findstring y,$(UCLIBC_HAS_FTW)$(UCLIBC_HAS_NFTW)) += $(MISC_FTW_OBJ)
 
-objclean-y += misc_ftw_clean
+objclean-y += CLEAN_libc/misc/ftw
 
-misc_ftw_clean:
+CLEAN_libc/misc/ftw:
 	$(do_rm) $(addprefix $(MISC_FTW_OUT)/*., o os)

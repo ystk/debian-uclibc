@@ -152,6 +152,7 @@ extern wchar_t *wcsncpy (wchar_t *__restrict __dest,
 /* Append SRC onto DEST.  */
 extern wchar_t *wcscat (wchar_t *__restrict __dest,
 			__const wchar_t *__restrict __src) __THROW;
+libc_hidden_proto(wcscat)
 /* Append no more than N wide-characters of SRC onto DEST.  */
 extern wchar_t *wcsncat (wchar_t *__restrict __dest,
 			 __const wchar_t *__restrict __src, size_t __n)
@@ -160,6 +161,7 @@ extern wchar_t *wcsncat (wchar_t *__restrict __dest,
 /* Compare S1 and S2.  */
 extern int wcscmp (__const wchar_t *__s1, __const wchar_t *__s2)
      __THROW __attribute_pure__;
+libc_hidden_proto(wcscmp)
 /* Compare N wide-characters of S1 and S2.  */
 extern int wcsncmp (__const wchar_t *__s1, __const wchar_t *__s2, size_t __n)
      __THROW __attribute_pure__;
@@ -180,9 +182,11 @@ extern int wcsncasecmp (__const wchar_t *__s1, __const wchar_t *__s2,
 
 extern int wcscasecmp_l (__const wchar_t *__s1, __const wchar_t *__s2,
 			 __locale_t __loc) __THROW;
+libc_hidden_proto(wcscasecmp_l)
 
 extern int wcsncasecmp_l (__const wchar_t *__s1, __const wchar_t *__s2,
 			  size_t __n, __locale_t __loc) __THROW;
+libc_hidden_proto(wcsncasecmp_l)
 #endif /* __UCLIBC_HAS_XLOCALE__ */
 #endif
 
@@ -190,6 +194,7 @@ __BEGIN_NAMESPACE_C99
 /* Compare S1 and S2, both interpreted as appropriate to the
    LC_COLLATE category of the current locale.  */
 extern int wcscoll (__const wchar_t *__s1, __const wchar_t *__s2) __THROW;
+libc_hidden_proto(wcscoll)
 /* Transform S2 into array pointed to by S1 such that if wcscmp is
    applied to two transformed strings the result is the as applying
    `wcscoll' to the original strings.  */
@@ -206,12 +211,14 @@ __END_NAMESPACE_C99
    LC_COLLATE category of the given locale.  */
 extern int wcscoll_l (__const wchar_t *__s1, __const wchar_t *__s2,
 		      __locale_t __loc) __THROW;
+libc_hidden_proto(wcscoll_l)
 
 /* Transform S2 into array pointed to by S1 such that if wcscmp is
    applied to two transformed strings the result is the as applying
    `wcscoll' to the original strings.  */
 extern size_t wcsxfrm_l (wchar_t *__s1, __const wchar_t *__s2,
 			 size_t __n, __locale_t __loc) __THROW;
+libc_hidden_proto(wcsxfrm_l)
 
 #endif /* __UCLIBC_HAS_XLOCALE__ */
 
@@ -244,9 +251,11 @@ extern size_t wcscspn (__const wchar_t *__wcs, __const wchar_t *__reject)
    consists entirely of wide characters in  ACCEPT.  */
 extern size_t wcsspn (__const wchar_t *__wcs, __const wchar_t *__accept)
      __THROW __attribute_pure__;
+libc_hidden_proto(wcsspn)
 /* Find the first occurrence in WCS of any character in ACCEPT.  */
 extern wchar_t *wcspbrk (__const wchar_t *__wcs, __const wchar_t *__accept)
      __THROW __attribute_pure__;
+libc_hidden_proto(wcspbrk)
 /* Find the first occurrence of NEEDLE in HAYSTACK.  */
 extern wchar_t *wcsstr (__const wchar_t *__haystack, __const wchar_t *__needle)
      __THROW __attribute_pure__;
@@ -258,9 +267,10 @@ extern wchar_t *wcstok (wchar_t *__restrict __s,
 
 /* Return the number of wide characters in S.  */
 extern size_t wcslen (__const wchar_t *__s) __THROW __attribute_pure__;
+libc_hidden_proto(wcslen)
 __END_NAMESPACE_C99
 
-#ifdef __USE_XOPEN
+#if defined __USE_XOPEN && defined __UCLIBC_SUSV3_LEGACY__
 /* Another name for `wcsstr' from XPG4.  */
 extern wchar_t *wcswcs (__const wchar_t *__haystack, __const wchar_t *__needle)
      __THROW __attribute_pure__;
@@ -270,6 +280,7 @@ extern wchar_t *wcswcs (__const wchar_t *__haystack, __const wchar_t *__needle)
 /* Return the number of wide characters in S, but at most MAXLEN.  */
 extern size_t wcsnlen (__const wchar_t *__s, size_t __maxlen)
      __THROW __attribute_pure__;
+libc_hidden_proto(wcsnlen)
 #endif
 
 
@@ -277,6 +288,7 @@ __BEGIN_NAMESPACE_C99
 /* Search N wide characters of S for C.  */
 extern wchar_t *wmemchr (__const wchar_t *__s, wchar_t __c, size_t __n)
      __THROW __attribute_pure__;
+libc_hidden_proto(wmemchr)
 
 /* Compare N wide characters of S1 and S2.  */
 extern int wmemcmp (__const wchar_t *__restrict __s1,
@@ -286,6 +298,7 @@ extern int wmemcmp (__const wchar_t *__restrict __s1,
 /* Copy N wide characters of SRC to DEST.  */
 extern wchar_t *wmemcpy (wchar_t *__restrict __s1,
 			 __const wchar_t *__restrict __s2, size_t __n) __THROW;
+libc_hidden_proto(wmemcpy)
 
 /* Copy N wide characters of SRC to DEST, guaranteeing
    correct behavior for overlapping strings.  */
@@ -302,6 +315,7 @@ __END_NAMESPACE_C99
 extern wchar_t *wmempcpy (wchar_t *__restrict __s1,
 			  __const wchar_t *__restrict __s2, size_t __n)
      __THROW;
+libc_hidden_proto(wmempcpy)
 #endif
 
 
@@ -309,6 +323,7 @@ __BEGIN_NAMESPACE_C99
 /* Determine whether C constitutes a valid (one-byte) multibyte
    character.  */
 extern wint_t btowc (int __c) __THROW;
+libc_hidden_proto(btowc)
 
 /* Determine whether C corresponds to a member of the extended
    character set whose multibyte representation is a single byte.  */
@@ -317,16 +332,19 @@ extern int wctob (wint_t __c) __THROW;
 /* Determine whether PS points to an object representing the initial
    state.  */
 extern int mbsinit (__const mbstate_t *__ps) __THROW __attribute_pure__;
+libc_hidden_proto(mbsinit)
 
 /* Write wide character representation of multibyte character pointed
    to by S to PWC.  */
 extern size_t mbrtowc (wchar_t *__restrict __pwc,
 		       __const char *__restrict __s, size_t __n,
 		       mbstate_t *__p) __THROW;
+libc_hidden_proto(mbrtowc)
 
 /* Write multibyte representation of wide character WC to S.  */
 extern size_t wcrtomb (char *__restrict __s, wchar_t __wc,
 		       mbstate_t *__restrict __ps) __THROW;
+libc_hidden_proto(wcrtomb)
 
 /* Return number of bytes in multibyte character pointed to by S.  */
 #if 0 /* uClibc: disabled */
@@ -335,18 +353,21 @@ extern size_t __mbrlen (__const char *__restrict __s, size_t __n,
 #endif
 extern size_t mbrlen (__const char *__restrict __s, size_t __n,
 		      mbstate_t *__restrict __ps) __THROW;
+libc_hidden_proto(mbrlen)
 
 /* Write wide character representation of multibyte character string
    SRC to DST.  */
 extern size_t mbsrtowcs (wchar_t *__restrict __dst,
 			 __const char **__restrict __src, size_t __len,
 			 mbstate_t *__restrict __ps) __THROW;
+libc_hidden_proto(mbsrtowcs)
 
 /* Write multibyte character representation of wide character string
    SRC to DST.  */
 extern size_t wcsrtombs (char *__restrict __dst,
 			 __const wchar_t **__restrict __src, size_t __len,
 			 mbstate_t *__restrict __ps) __THROW;
+libc_hidden_proto(wcsrtombs)
 __END_NAMESPACE_C99
 
 
@@ -356,6 +377,7 @@ __END_NAMESPACE_C99
 extern size_t mbsnrtowcs (wchar_t *__restrict __dst,
 			  __const char **__restrict __src, size_t __nmc,
 			  size_t __len, mbstate_t *__restrict __ps) __THROW;
+libc_hidden_proto(mbsnrtowcs)
 
 /* Write multibyte character representation of at most NWC characters
    from the wide character string SRC to DST.  */
@@ -363,6 +385,7 @@ extern size_t wcsnrtombs (char *__restrict __dst,
 			  __const wchar_t **__restrict __src,
 			  size_t __nwc, size_t __len,
 			  mbstate_t *__restrict __ps) __THROW;
+libc_hidden_proto(wcsnrtombs)
 #endif	/* use GNU */
 
 
@@ -374,6 +397,7 @@ extern int wcwidth (wchar_t __c) __THROW;
 /* Determine number of column positions required for first N wide
    characters (or fewer if S ends before this) in S.  */
 extern int wcswidth (__const wchar_t *__s, size_t __n) __THROW;
+libc_hidden_proto(wcswidth)
 #endif	/* Use X/Open.  */
 
 
@@ -539,6 +563,7 @@ extern int vfwprintf (__FILE *__restrict __s,
 		      __const wchar_t *__restrict __format,
 		      __gnuc_va_list __arg)
      /* __attribute__ ((__format__ (__wprintf__, 2, 0))) */;
+libc_hidden_proto(vfwprintf)
 /* Write formatted output to stdout from argument list ARG.
 
    This function is a possible cancellation point and therefore not
@@ -552,6 +577,7 @@ extern int vswprintf (wchar_t *__restrict __s, size_t __n,
 		      __const wchar_t *__restrict __format,
 		      __gnuc_va_list __arg)
      __THROW /* __attribute__ ((__format__ (__wprintf__, 3, 0))) */;
+libc_hidden_proto(vswprintf)
 
 
 /* Read formatted input from STREAM.
@@ -586,6 +612,7 @@ extern int vfwscanf (__FILE *__restrict __s,
 		     __const wchar_t *__restrict __format,
 		     __gnuc_va_list __arg)
      /* __attribute__ ((__format__ (__wscanf__, 2, 0))) */;
+libc_hidden_proto(vfwscanf)
 /* Read formatted input from stdin into argument list ARG.
 
    This function is a possible cancellation point and therefore not
@@ -598,6 +625,7 @@ extern int vswscanf (__const wchar_t *__restrict __s,
 		     __const wchar_t *__restrict __format,
 		     __gnuc_va_list __arg)
      __THROW /* __attribute__ ((__format__ (__wscanf__, 2, 0))) */;
+libc_hidden_proto(vswscanf)
 
 __END_NAMESPACE_C99
 #endif /* Use ISO C99. */
@@ -609,6 +637,7 @@ __BEGIN_NAMESPACE_C99
    These functions are possible cancellation points and therefore not
    marked with __THROW.  */
 extern wint_t fgetwc (__FILE *__stream);
+libc_hidden_proto(fgetwc)
 extern wint_t getwc (__FILE *__stream);
 
 /* Read a character from stdin.
@@ -646,6 +675,7 @@ extern wchar_t *fgetws (wchar_t *__restrict __ws, int __n,
    marked with __THROW.  */
 extern int fputws (__const wchar_t *__restrict __ws,
 		   __FILE *__restrict __stream);
+libc_hidden_proto(fputws)
 
 
 /* Push a character back onto the input buffer of STREAM.
@@ -653,6 +683,7 @@ extern int fputws (__const wchar_t *__restrict __ws,
    This function is a possible cancellation points and therefore not
    marked with __THROW.  */
 extern wint_t ungetwc (wint_t __wc, __FILE *__stream);
+libc_hidden_proto(ungetwc)
 __END_NAMESPACE_C99
 
 
@@ -674,6 +705,7 @@ extern wint_t getwchar_unlocked (void);
    or due to the implementation it is a cancellation point and
    therefore not marked with __THROW.  */
 extern wint_t fgetwc_unlocked (__FILE *__stream);
+libc_hidden_proto(fgetwc_unlocked)
 
 /* Faster version when locking is not necessary.
 
@@ -682,6 +714,7 @@ extern wint_t fgetwc_unlocked (__FILE *__stream);
    or due to the implementation it is a cancellation point and
    therefore not marked with __THROW.  */
 extern wint_t fputwc_unlocked (wchar_t __wc, __FILE *__stream);
+libc_hidden_proto(fputwc_unlocked)
 
 /* These are defined to be equivalent to the `char' functions defined
    in POSIX.1:1996.
@@ -702,6 +735,7 @@ extern wint_t putwchar_unlocked (wchar_t __wc);
    therefore not marked with __THROW.  */
 extern wchar_t *fgetws_unlocked (wchar_t *__restrict __ws, int __n,
 				 __FILE *__restrict __stream);
+libc_hidden_proto(fgetws_unlocked)
 
 /* This function does the same as `fputws' but does not lock the stream.
 
@@ -711,6 +745,7 @@ extern wchar_t *fgetws_unlocked (wchar_t *__restrict __ws, int __n,
    therefore not marked with __THROW.  */
 extern int fputws_unlocked (__const wchar_t *__restrict __ws,
 			    __FILE *__restrict __stream);
+libc_hidden_proto(fputws_unlocked)
 #endif
 
 
@@ -732,6 +767,7 @@ extern size_t wcsftime_l (wchar_t *__restrict __s, size_t __maxsize,
 			  __const wchar_t *__restrict __format,
 			  __const struct tm *__restrict __tp,
 			  __locale_t __loc) __THROW;
+libc_hidden_proto(wcsftime_l)
 # endif
 
 /* The X/Open standard demands that most of the functions defined in
@@ -743,6 +779,11 @@ extern size_t wcsftime_l (wchar_t *__restrict __s, size_t __maxsize,
 #if defined __USE_UNIX98 && !defined __USE_GNU
 # define __need_iswxxx
 # include <wctype.h>
+#endif
+
+#ifdef _LIBC
+extern size_t __wcslcpy(wchar_t *__restrict dst,
+			const wchar_t *__restrict src, size_t n) attribute_hidden;
 #endif
 
 __END_DECLS

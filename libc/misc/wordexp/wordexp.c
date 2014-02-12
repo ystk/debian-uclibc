@@ -20,6 +20,7 @@
    Boston, MA 02111-1307, USA.  */
 
 #include <features.h>
+#include <bits/kernel-features.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <fcntl.h>
@@ -35,55 +36,15 @@
 #include <glob.h>
 #include <wordexp.h>
 
-/* Experimentally off - libc_hidden_proto(mempcpy) */
-/* Experimentally off - libc_hidden_proto(stpcpy) */
-/* Experimentally off - libc_hidden_proto(strchr) */
-/* Experimentally off - libc_hidden_proto(strcpy) */
-/* Experimentally off - libc_hidden_proto(strdup) */
-/* Experimentally off - libc_hidden_proto(strlen) */
-/* Experimentally off - libc_hidden_proto(strndup) */
-/* Experimentally off - libc_hidden_proto(strspn) */
-/* Experimentally off - libc_hidden_proto(strcspn) */
-libc_hidden_proto(setenv)
-libc_hidden_proto(unsetenv)
-libc_hidden_proto(waitpid)
-libc_hidden_proto(kill)
-libc_hidden_proto(getuid)
-libc_hidden_proto(getpwnam_r)
-libc_hidden_proto(getpwuid_r)
-libc_hidden_proto(execve)
-libc_hidden_proto(dup2)
-libc_hidden_proto(atoi)
-libc_hidden_proto(fnmatch)
-libc_hidden_proto(pipe)
-libc_hidden_proto(fork)
-libc_hidden_proto(open)
-libc_hidden_proto(close)
-libc_hidden_proto(read)
-libc_hidden_proto(getenv)
-libc_hidden_proto(getpid)
-libc_hidden_proto(sprintf)
-libc_hidden_proto(fprintf)
-libc_hidden_proto(abort)
-libc_hidden_proto(glob)
-libc_hidden_proto(globfree)
-libc_hidden_proto(wordfree)
-#ifdef __UCLIBC_HAS_XLOCALE__
-libc_hidden_proto(__ctype_b_loc)
-#elif defined __UCLIBC_HAS_CTYPE_TABLES__
-libc_hidden_proto(__ctype_b)
-#endif
-
 #define __WORDEXP_FULL
-//#undef __WORDEXP_FULL
 
 /*
  * This is a recursive-descent-style word expansion routine.
  */
 
 /* These variables are defined and initialized in the startup code.  */
-//extern int __libc_argc;
-//extern char **__libc_argv;
+/*extern int __libc_argc;*/
+/*extern char **__libc_argv;*/
 
 /* FIXME!!!! */
 int attribute_hidden __libc_argc;
@@ -138,8 +99,9 @@ static __inline__ char *w_addchar(char *buffer, size_t * actlen,
 
 	return buffer;
 }
-
+#ifndef MAX
 #define MAX( a, b ) ( ( ( a ) > ( b ) ) ? ( a ) : ( b ) )
+#endif
 static char *w_addmem(char *buffer, size_t * actlen, size_t * maxlen,
 					  const char *str, size_t len)
 {
@@ -373,8 +335,8 @@ parse_tilde(char **word, size_t * word_length, size_t * max_length,
 
 static int
 do_parse_glob(const char *glob_word, char **word, size_t * word_length,
-			  size_t * max_length, wordexp_t * pwordexp, const char *ifs,
-			  const char *ifs_white)
+			  size_t * max_length, wordexp_t * pwordexp, const char *ifs
+			  /*, const char *ifs_white*/)
 {
 	int error;
 	int match;
@@ -497,7 +459,7 @@ parse_glob(char **word, size_t * word_length, size_t * max_length,
 	*word = w_newword(word_length, max_length);
 	for (i = 0; error == 0 && i < glob_list.we_wordc; i++)
 		error = do_parse_glob(glob_list.we_wordv[i], word, word_length,
-							  max_length, pwordexp, ifs, ifs_white);
+				max_length, pwordexp, ifs /*, ifs_white*/);
 
 	/* Now tidy up */
   tidy_up:
@@ -796,16 +758,21 @@ exec_comm_child(char *comm, int *fildes, int showerr, int noexec)
 
 	/* Redirect output.  */
 	fd = fildes[1];
-	if (fd != 1) {
-		dup2(fd, 1);
+	if (likely(fd != STDOUT_FILENO)) {
+		dup2(fd, STDOUT_FILENO);
 		close(fd);
 	}
-
+#if defined O_CLOEXEC && defined __UCLIBC_LINUX_SPECIFIC__ && defined __ASSUME_PIPE2
+	else {
+		/* Reset the close-on-exec flag (if necessary).  */
+		fcntl (fd, F_SETFD, 0);
+	}
+#endif
 	/* Redirect stderr to /dev/null if we have to.  */
 	if (showerr == 0) {
-		close(2);
+		close(STDERR_FILENO);
 		fd = open(_PATH_DEVNULL, O_WRONLY);
-		if (fd >= 0 && fd != 2) {
+		if (fd >= 0 && fd != STDERR_FILENO) {
 			dup2(fd, 2);
 			close(fd);
 		}
@@ -841,10 +808,15 @@ exec_comm(char *comm, char **word, size_t * word_length,
 	/* Don't fork() unless necessary */
 	if (!comm || !*comm)
 		return 0;
-
-	if (pipe(fildes))
+#if defined O_CLOEXEC && defined __UCLIBC_LINUX_SPECIFIC__ && defined __ASSUME_PIPE2
+	if (pipe2(fildes, O_CLOEXEC) < 0)
 		/* Bad */
 		return WRDE_NOSPACE;
+#else
+	if (pipe(fildes) < 0)
+		/* Bad */
+		return WRDE_NOSPACE;
+#endif
 
 	if ((pid = fork()) < 0) {
 		/* Bad */
@@ -1484,28 +1456,28 @@ parse_param(char **word, size_t * word_length, size_t * max_length,
 			size_t exp_len;
 			size_t exp_maxl;
 			char *p;
-			int quoted = 0;		/* 1: single quotes; 2: double */
+			int quotes = 0;		/* 1: single quotes; 2: double */
 
 			expanded = w_newword(&exp_len, &exp_maxl);
 			for (p = pattern; p && *p; p++) {
-				size_t offset;
+				size_t _offset;
 
 				switch (*p) {
 				case '"':
-					if (quoted == 2)
-						quoted = 0;
-					else if (quoted == 0)
-						quoted = 2;
+					if (quotes == 2)
+						quotes = 0;
+					else if (quotes == 0)
+						quotes = 2;
 					else
 						break;
 
 					continue;
 
 				case '\'':
-					if (quoted == 1)
-						quoted = 0;
-					else if (quoted == 0)
-						quoted = 1;
+					if (quotes == 1)
+						quotes = 0;
+					else if (quotes == 0)
+						quotes = 1;
 					else
 						break;
 
@@ -1513,7 +1485,7 @@ parse_param(char **word, size_t * word_length, size_t * max_length,
 
 				case '*':
 				case '?':
-					if (quoted) {
+					if (quotes) {
 						/* Convert quoted wildchar to escaped wildchar. */
 						expanded = w_addchar(expanded, &exp_len,
 											 &exp_maxl, '\\');
@@ -1524,9 +1496,9 @@ parse_param(char **word, size_t * word_length, size_t * max_length,
 					break;
 
 				case '$':
-					offset = 0;
+					_offset = 0;
 					error = parse_dollars(&expanded, &exp_len, &exp_maxl, p,
-									  &offset, flags, NULL, NULL, NULL, 1);
+									  &_offset, flags, NULL, NULL, NULL, 1);
 					if (error) {
 						if (free_value)
 							free(value);
@@ -1536,16 +1508,16 @@ parse_param(char **word, size_t * word_length, size_t * max_length,
 						goto do_error;
 					}
 
-					p += offset;
+					p += _offset;
 					continue;
 
 				case '~':
-					if (quoted || exp_len)
+					if (quotes || exp_len)
 						break;
 
-					offset = 0;
+					_offset = 0;
 					error = parse_tilde(&expanded, &exp_len, &exp_maxl, p,
-										&offset, 0);
+										&_offset, 0);
 					if (error) {
 						if (free_value)
 							free(value);
@@ -1555,7 +1527,7 @@ parse_param(char **word, size_t * word_length, size_t * max_length,
 						goto do_error;
 					}
 
-					p += offset;
+					p += _offset;
 					continue;
 
 				case '\\':

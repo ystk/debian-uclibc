@@ -32,39 +32,27 @@
 #if defined __UCLIBC_HAS_SYSLOG__
 #include <sys/syslog.h>
 
-libc_hidden_proto(openlog)
-libc_hidden_proto(syslog)
-libc_hidden_proto(closelog)
 #endif
 
-libc_hidden_proto(sigaction)
-libc_hidden_proto(sigfillset)
-libc_hidden_proto(sigdelset)
-libc_hidden_proto(sigprocmask)
-libc_hidden_proto(write)
-libc_hidden_proto(kill)
-libc_hidden_proto(getpid)
-libc_hidden_proto(_exit)
 
 static void block_signals(void)
 {
 	struct sigaction sa;
 	sigset_t mask;
 
-	sigfillset(&mask);
-
-	sigdelset(&mask, SSP_SIGTYPE);	/* Block all signal handlers */
+	__sigfillset(&mask);
+	__sigdelset(&mask, SSP_SIGTYPE);	/* Block all signal handlers */
 	sigprocmask(SIG_BLOCK, &mask, NULL);	/* except SSP_SIGTYPE */
 
 	/* Make the default handler associated with the signal handler */
-	memset(&sa, 0, sizeof(struct sigaction));
-	sigfillset(&sa.sa_mask);	/* Block all signals */
-	sa.sa_flags = 0;
-	sa.sa_handler = SIG_DFL;
+	memset(&sa, 0, sizeof(sa));
+	__sigfillset(&sa.sa_mask);	/* Block all signals */
+	if (SIG_DFL) /* if it's constant zero, it's already done */
+		sa.sa_handler = SIG_DFL;
 	sigaction(SSP_SIGTYPE, &sa, NULL);
 }
 
-static void ssp_write(int fd, const char *msg1, const char *msg2, const char *msg3)
+static void __cold ssp_write(int fd, const char *msg1, const char *msg2, const char *msg3)
 {
 	write(fd, msg1, strlen(msg1));
 	write(fd, msg2, strlen(msg2));
@@ -83,7 +71,8 @@ static attribute_noreturn void terminate(void)
 	_exit(127);
 }
 
-void __stack_smash_handler(char func[], int damaged __attribute__ ((unused))) attribute_noreturn;
+#ifdef __UCLIBC_HAS_SSP_COMPAT__
+void __stack_smash_handler(char func[], int damaged __attribute__ ((unused))) attribute_noreturn __cold;
 void __stack_smash_handler(char func[], int damaged)
 {
 	static const char message[] = ": stack smashing attack in function ";
@@ -96,8 +85,10 @@ void __stack_smash_handler(char func[], int damaged)
 	while(1)
 		terminate();
 }
+#endif
 
-void __stack_chk_fail(void) attribute_noreturn;
+#ifdef __UCLIBC_HAS_SSP__
+void __stack_chk_fail(void) attribute_noreturn __cold;
 void __stack_chk_fail(void)
 {
 	static const char msg1[] = "stack smashing detected: ";
@@ -111,9 +102,9 @@ void __stack_chk_fail(void)
 	while(1)
 		terminate();
 }
+#endif
 
-#if 0
-void __chk_fail(void) attribute_noreturn;
+#ifdef __UCLIBC_HAS_FORTIFY__
 void __chk_fail(void)
 {
 	static const char msg1[] = "buffer overflow detected: ";
@@ -127,4 +118,5 @@ void __chk_fail(void)
 	while(1)
 		terminate();
 }
+libc_hidden_def(__chk_fail)
 #endif

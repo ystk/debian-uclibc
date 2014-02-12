@@ -24,11 +24,7 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <sys/statfs.h>
-//#include <sys/statvfs.h>
 
-//#include "linux_fsinfo.h"
-
-libc_hidden_proto(fstat)
 
 #ifndef __USE_FILE_OFFSET64
 extern int fstatfs (int __fildes, struct statfs *__buf)
@@ -43,7 +39,6 @@ extern int fstatfs (int __fildes, struct statfs *__buf)
 #endif
 
 extern __typeof(fstatfs) __libc_fstatfs;
-libc_hidden_proto(__libc_fstatfs)
 
 /* The Linux kernel headers mention this as a kind of generic value.  */
 #define LINUX_LINK_MAX	127

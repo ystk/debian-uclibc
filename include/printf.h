@@ -41,7 +41,7 @@ __BEGIN_DECLS
  * need to support bitfields since that's what glibc made visible to users.
  * So, we take
  * advantage of how gcc lays out bitfields to create an appropriate
- * mapping.  Inside uclibc (_LIBC is defined) we access the
+ * mapping.  Inside uclibc (i.e. if _LIBC is defined) we access the
  * bitfields using bitmasks in a single flag variable.
  *
  * WARNING -- This may very well fail if built with -fpack-struct!!!

@@ -20,7 +20,6 @@
 #include "pthread.h"
 #include "internals.h"
 #include "spinlock.h"
-#include <ucontext.h>
 #include <bits/sigcontextinfo.h>
 
 /* mods for uClibc: __libc_sigaction is not in any standard headers */
@@ -196,7 +195,7 @@ int sigwait(const sigset_t * set, int * sig)
      and if not, install our dummy handler.  This is conformant to
      POSIX: "The effect of sigwait() on the signal actions for the
      signals in set is unspecified." */
-  sigfillset(&mask);
+  __sigfillset(&mask);
   sigdelset(&mask, __pthread_sig_cancel);
   for (s = 1; s <= NSIG; s++) {
     if (sigismember(set, s) &&
@@ -207,9 +206,8 @@ int sigwait(const sigset_t * set, int * sig)
       if (sighandler[s].old == NULL ||
 	  sighandler[s].old == (arch_sighandler_t) SIG_DFL ||
 	  sighandler[s].old == (arch_sighandler_t) SIG_IGN) {
+        memset(&sa, 0, sizeof(sa));
         sa.sa_handler = pthread_null_sighandler;
-        sigemptyset(&sa.sa_mask);
-        sa.sa_flags = 0;
         sigaction(s, &sa, NULL);
       }
     }
