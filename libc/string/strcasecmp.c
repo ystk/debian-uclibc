@@ -12,28 +12,15 @@
 #ifdef WANT_WIDE
 # define strcasecmp wcscasecmp
 # define strcasecmp_l wcscasecmp_l
-libc_hidden_proto(wcscasecmp)
-# if defined(__USE_GNU) && defined(__UCLIBC_HAS_XLOCALE__)
-libc_hidden_proto(wcscasecmp_l)
-# endif
 # ifdef __UCLIBC_DO_XLOCALE
-libc_hidden_proto(towlower_l)
 #  define TOLOWER(C) towlower_l((C), locale_arg)
 # else
-libc_hidden_proto(towlower)
 #  define TOLOWER(C) towlower((C))
 # endif
 #else
-/* Experimentally off - libc_hidden_proto(strcasecmp) */
-/* Experimentally off - libc_hidden_proto(strcasecmp_l) */
 # ifdef __UCLIBC_DO_XLOCALE
-libc_hidden_proto(tolower_l)
 #  define TOLOWER(C) tolower_l((C), locale_arg)
 # else
-#if !defined __UCLIBC_HAS_XLOCALE__ && defined __UCLIBC_HAS_CTYPE_TABLES__
-libc_hidden_proto(__ctype_tolower)
-#endif
-libc_hidden_proto(tolower)
 #  define TOLOWER(C) tolower((C))
 # endif
 #endif
@@ -44,11 +31,12 @@ int strcasecmp(register const Wchar *s1, register const Wchar *s2)
 {
 	return strcasecmp_l(s1, s2, __UCLIBC_CURLOCALE);
 }
+#ifndef WANT_WIDE
 libc_hidden_def(strcasecmp)
+#endif
 
 #else  /* defined(__UCLIBC_HAS_XLOCALE__) && !defined(__UCLIBC_DO_XLOCALE) */
 
-/* Experimentally off - libc_hidden_proto(__XL_NPP(strcasecmp)) */
 int __XL_NPP(strcasecmp)(register const Wchar *s1, register const Wchar *s2
 					  __LOCALE_PARAM )
 {
@@ -73,6 +61,8 @@ int __XL_NPP(strcasecmp)(register const Wchar *s1, register const Wchar *s2
 	return r;
 #endif
 }
+#if !defined WANT_WIDE || (defined WANT_WIDE && defined __UCLIBC_DO_XLOCALE)
 libc_hidden_def(__XL_NPP(strcasecmp))
+#endif
 
 #endif /* defined(__UCLIBC_HAS_XLOCALE__) && !defined(__UCLIBC_DO_XLOCALE) */

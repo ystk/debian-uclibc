@@ -70,7 +70,7 @@ _dl_linux_resolver(struct elf_resolve *tpnt, int reloc_entry)
 	got_addr = (char **)instr_addr;
 
 	/* Get the address of the GOT entry. */
-	new_addr = _dl_find_hash(symname, tpnt->symbol_scope, tpnt, ELF_RTYPE_CLASS_PLT);
+	new_addr = _dl_find_hash(symname, tpnt->symbol_scope, tpnt, ELF_RTYPE_CLASS_PLT, NULL);
 	if (unlikely(!new_addr)) {
 		_dl_dprintf(2, "%s: Can't resolve symbol '%s'\n", _dl_progname, symname);
 		_dl_exit(1);
@@ -157,7 +157,10 @@ _dl_do_reloc(struct elf_resolve *tpnt, struct dyn_elf *scope,
 	int reloc_type;
 	int symtab_index;
 	char *symname;
-	ElfW(Sym) *sym;
+#if defined USE_TLS && USE_TLS
+	struct elf_resolve *tls_tpnt;
+#endif
+	struct symbol_ref sym_ref;
 	ElfW(Addr) *reloc_addr;
 	ElfW(Addr) symbol_addr;
 #if defined (__SUPPORT_LD_DEBUG__)
@@ -167,23 +170,37 @@ _dl_do_reloc(struct elf_resolve *tpnt, struct dyn_elf *scope,
 	reloc_addr = (ElfW(Addr)*)(tpnt->loadaddr + (unsigned long)rpnt->r_offset);
 	reloc_type = ELF_R_TYPE(rpnt->r_info);
 	symtab_index = ELF_R_SYM(rpnt->r_info);
-	sym = &symtab[symtab_index];
+	sym_ref.sym = &symtab[symtab_index];
+	sym_ref.tpnt = NULL;
 	symbol_addr = 0;
-	symname = strtab + sym->st_name;
+	symname = strtab + sym_ref.sym->st_name;
 
 	if (symtab_index) {
 		symbol_addr = (ElfW(Addr))_dl_find_hash(symname, scope, tpnt,
-							    elf_machine_type_class(reloc_type));
+				elf_machine_type_class(reloc_type), &sym_ref);
 		/*
 		 * We want to allow undefined references to weak symbols - this
 		 * might have been intentional.  We should not be linking local
 		 * symbols here, so all bases should be covered.
 		 */
-		if (unlikely(!symbol_addr && ELF_ST_BIND(sym->st_info) != STB_WEAK)) {
-			_dl_dprintf(2, "%s: can't resolve symbol '%s'\n", _dl_progname, symname);
-			_dl_exit(1);
+		if (unlikely(!symbol_addr && (ELF_ST_TYPE(sym_ref.sym->st_info) != STT_TLS)
+					&& (ELF_ST_BIND(sym_ref.sym->st_info) != STB_WEAK))) {
+			/* This may be non-fatal if called from dlopen. */
+			return 1;
 		}
+#if defined USE_TLS && USE_TLS
+		tls_tpnt = sym_ref.tpnt;
+#endif
+	} else {
+		/* Relocs against STN_UNDEF are usually treated as using a
+		 * symbol value of zero, and using the module containing the
+		 * reloc itself. */
+		symbol_addr = sym_ref.sym->st_value;
+#if defined USE_TLS && USE_TLS
+		tls_tpnt = tpnt;
+#endif
 	}
+
 
 #if defined (__SUPPORT_LD_DEBUG__)
 	old_val = *reloc_addr;
@@ -211,15 +228,24 @@ _dl_do_reloc(struct elf_resolve *tpnt, struct dyn_elf *scope,
 			*reloc_addr = map->l_addr + rpnt->r_addend;
 			break;
 		*/
+#if defined USE_TLS && USE_TLS
 		case R_X86_64_DTPMOD64:
-			*reloc_addr = 1;
+			*reloc_addr = tls_tpnt->l_tls_modid;
 			break;
 		case R_X86_64_DTPOFF64:
-			*reloc_addr = sym->st_value + rpnt->r_addend;
+			/* During relocation all TLS symbols are defined and used.
+			 * Therefore the offset is already correct.  */
+			*reloc_addr = symbol_addr + rpnt->r_addend;
 			break;
 		case R_X86_64_TPOFF64:
-			*reloc_addr = sym->st_value + rpnt->r_addend - symbol_addr;
+			/* The offset is negative, forward from the thread pointer.
+			 * We know the offset of the object the symbol is contained in.
+			 * It is a negative value which will be added to the
+			 * thread pointer.  */
+			CHECK_STATIC_TLS ((struct link_map *) tls_tpnt);
+			*reloc_addr = symbol_addr - tls_tpnt->l_tls_offset + rpnt->r_addend;
 			break;
+#endif
 		case R_X86_64_32:
 			*(unsigned int *) reloc_addr = symbol_addr + rpnt->r_addend;
 			/* XXX: should check for overflow eh ? */
@@ -231,13 +257,13 @@ _dl_do_reloc(struct elf_resolve *tpnt, struct dyn_elf *scope,
 				if (_dl_debug_move)
 					_dl_dprintf(_dl_debug_file,
 						    "\t%s move %d bytes from %x to %x\n",
-						    symname, sym->st_size,
+						    symname, sym_ref.sym->st_size,
 						    symbol_addr, reloc_addr);
 #endif
 
 				_dl_memcpy((char *)reloc_addr,
 					   (char *)symbol_addr,
-					   sym->st_size);
+					   sym_ref.sym->st_size);
 			} else
 				_dl_dprintf(_dl_debug_file, "no symbol_addr to copy !?\n");
 			break;

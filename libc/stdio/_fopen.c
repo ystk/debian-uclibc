@@ -7,9 +7,6 @@
 
 #include "_stdio.h"
 
-libc_hidden_proto(isatty)
-libc_hidden_proto(open)
-libc_hidden_proto(fcntl)
 
 /*
  * Cases:
@@ -102,7 +99,7 @@ FILE attribute_hidden *_stdio_fopen(intptr_t fname_or_mode,
 #ifdef __UCLIBC_HAS_THREADS__
 		/* We only initialize the mutex in the non-freopen case. */
 		/* stream->__user_locking = _stdio_user_locking; */
-		__stdio_init_mutex(&stream->__lock);
+		STDIO_INIT_MUTEX(stream->__lock);
 #endif
 	}
 
@@ -121,11 +118,11 @@ FILE attribute_hidden *_stdio_fopen(intptr_t fname_or_mode,
 		i = (open_mode & (O_ACCMODE|O_LARGEFILE)) + 1;
 
 		/* NOTE: fopencookie needs changing if the basic check changes! */
-		if (((i & (((int) fname_or_mode) + 1)) != i) /* Basic agreement? */
-			|| (((open_mode & ~((__mode_t) fname_or_mode)) & O_APPEND)
-				&& fcntl(filedes, F_SETFL, O_APPEND))	/* Need O_APPEND. */
-			) {
+		if ((i & ((int)fname_or_mode + 1)) != i) /* Basic agreement? */
 			goto DO_EINVAL;
+		if ((open_mode & ~(__mode_t)fname_or_mode) & O_APPEND) {
+			if (fcntl(filedes, F_SETFL, O_APPEND))	/* Need O_APPEND. */
+				goto DO_EINVAL;
 		}
 		/* For later... to reflect largefile setting in stream flags. */
 		__STDIO_WHEN_LFS( open_mode |= (((__mode_t) fname_or_mode)
@@ -159,9 +156,15 @@ FILE attribute_hidden *_stdio_fopen(intptr_t fname_or_mode,
 		((((open_mode & O_ACCMODE) + 1) ^ 0x03) * __FLAG_WRITEONLY);
 
 #ifdef __STDIO_BUFFERS
-	i = errno;					/* Preserve errno against isatty call. */
-	stream->__modeflags |= (isatty(stream->__filedes) * __FLAG_LBF);
-	__set_errno(i);
+	if (stream->__filedes != INT_MAX) {
+		/* NB: fopencookie uses bogus filedes == INT_MAX,
+		 * avoiding isatty() in that case.
+		 */
+		i = errno; /* preserve errno against isatty call. */
+		if (isatty(stream->__filedes))
+			stream->__modeflags |= __FLAG_LBF;
+		__set_errno(i);
+	}
 
 	if (!stream->__bufstart) {
 		if ((stream->__bufstart = malloc(BUFSIZ)) != NULL) {
@@ -194,7 +197,7 @@ FILE attribute_hidden *_stdio_fopen(intptr_t fname_or_mode,
 #ifdef __UCLIBC_HAS_THREADS__
 	/* Even in the freopen case, we reset the user locking flag. */
 	stream->__user_locking = _stdio_user_locking;
-	/* __stdio_init_mutex(&stream->__lock); */
+	/* STDIO_INIT_MUTEX(stream->__lock); */
 #endif
 
 #ifdef __STDIO_HAS_OPENLIST

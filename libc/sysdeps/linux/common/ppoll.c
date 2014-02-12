@@ -20,23 +20,19 @@
 #include <signal.h>
 #include <sys/syscall.h>
 #include <sys/poll.h>
+#define __need_NULL
+#include <stddef.h>
 
 #if defined __NR_ppoll && defined __UCLIBC_LINUX_SPECIFIC__
-
-libc_hidden_proto(ppoll)
-
-# define __NR___libc_ppoll __NR_ppoll
-static __always_inline
-_syscall5(int, __libc_ppoll,
-	struct pollfd *, fds,
-	nfds_t, nfds,
-	const struct timespec *, timeout,
-	const __sigset_t *, sigmask,
-	size_t, sigsetsize)
+# ifdef __UCLIBC_HAS_THREADS_NATIVE__
+#  include <sysdep-cancel.h>
+# else
+#  define SINGLE_THREAD_P 1
+# endif
 
 int
 ppoll(struct pollfd *fds, nfds_t nfds, const struct timespec *timeout,
-       const __sigset_t *sigmask)
+       const sigset_t *sigmask)
 {
 	/* The Linux kernel can in some situations update the timeout value.
 	   We do not want that so use a local variable.  */
@@ -45,9 +41,15 @@ ppoll(struct pollfd *fds, nfds_t nfds, const struct timespec *timeout,
 		tval = *timeout;
 		timeout = &tval;
 	}
+  if (SINGLE_THREAD_P)
+		return INLINE_SYSCALL(ppoll, 5, fds, nfds, timeout, sigmask, _NSIG / 8);
 
-	return __libc_ppoll(fds, nfds, timeout, sigmask, _NSIG / 8);
+# ifdef __UCLIBC_HAS_THREADS_NATIVE__
+	int oldtype = LIBC_CANCEL_ASYNC ();
+	int result = INLINE_SYSCALL(ppoll, 5, fds, nfds, timeout, sigmask, _NSIG / 8);
+	LIBC_CANCEL_RESET (oldtype);
+	return result;
+# endif
 }
 libc_hidden_def(ppoll)
-
 #endif

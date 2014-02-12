@@ -335,12 +335,28 @@
 # define __arch_atomic_decrement_if_positive_64(mem) \
     ({ abort (); (*mem)--; })
 
+#ifdef _ARCH_PWR4
+/*
+ * Newer powerpc64 processors support the new "light weight" sync (lwsync)
+ * So if the build is using -mcpu=[power4,power5,power5+,970] we can
+ * safely use lwsync.
+ */
+# define atomic_read_barrier()	__asm__ ("lwsync" ::: "memory")
+/*
+ * "light weight" sync can also be used for the release barrier.
+ */
+# ifndef UP
+#  define __ARCH_REL_INSTR	"lwsync"
+# endif
+#else
+
 /*
  * Older powerpc32 processors don't support the new "light weight"
  * sync (lwsync).  So the only safe option is to use normal sync
  * for all powerpc32 applications.
  */
 # define atomic_read_barrier()	__asm__ ("sync" ::: "memory")
+#endif
 
 #endif
 
@@ -385,6 +401,13 @@ typedef uintmax_t uatomic_max_t;
 # ifndef __ARCH_REL_INSTR
 #  define __ARCH_REL_INSTR	"sync"
 # endif
+#endif
+
+#ifndef MUTEX_HINT_ACQ
+# define MUTEX_HINT_ACQ
+#endif
+#ifndef MUTEX_HINT_REL
+# define MUTEX_HINT_REL
 #endif
 
 #define atomic_full_barrier()	__asm__ ("sync" ::: "memory")
@@ -512,7 +535,7 @@ typedef uintmax_t uatomic_max_t;
       __result = __arch_compare_and_exchange_val_32_acq(mem, newval, oldval); \
     else if (sizeof (*mem) == 8)					      \
       __result = __arch_compare_and_exchange_val_64_acq(mem, newval, oldval); \
-    else 								      \
+    else								      \
        abort ();							      \
     __result;								      \
   })
@@ -524,7 +547,7 @@ typedef uintmax_t uatomic_max_t;
       __result = __arch_compare_and_exchange_val_32_rel(mem, newval, oldval); \
     else if (sizeof (*mem) == 8)					      \
       __result = __arch_compare_and_exchange_val_64_rel(mem, newval, oldval); \
-    else 								      \
+    else								      \
        abort ();							      \
     __result;								      \
   })
@@ -536,7 +559,7 @@ typedef uintmax_t uatomic_max_t;
       __result = __arch_atomic_exchange_32_acq (mem, value);		      \
     else if (sizeof (*mem) == 8)					      \
       __result = __arch_atomic_exchange_64_acq (mem, value);		      \
-    else 								      \
+    else								      \
        abort ();							      \
     __result;								      \
   })
@@ -548,7 +571,7 @@ typedef uintmax_t uatomic_max_t;
       __result = __arch_atomic_exchange_32_rel (mem, value);		      \
     else if (sizeof (*mem) == 8)					      \
       __result = __arch_atomic_exchange_64_rel (mem, value);		      \
-    else 								      \
+    else								      \
        abort ();							      \
     __result;								      \
   })
@@ -560,7 +583,7 @@ typedef uintmax_t uatomic_max_t;
       __result = __arch_atomic_exchange_and_add_32 (mem, value);	      \
     else if (sizeof (*mem) == 8)					      \
       __result = __arch_atomic_exchange_and_add_64 (mem, value);	      \
-    else 								      \
+    else								      \
        abort ();							      \
     __result;								      \
   })
@@ -572,7 +595,7 @@ typedef uintmax_t uatomic_max_t;
       __result = __arch_atomic_increment_val_32 (mem);			      \
     else if (sizeof (*(mem)) == 8)					      \
       __result = __arch_atomic_increment_val_64 (mem);			      \
-    else 								      \
+    else								      \
        abort ();							      \
     __result;								      \
   })
@@ -586,7 +609,7 @@ typedef uintmax_t uatomic_max_t;
       __result = __arch_atomic_decrement_val_32 (mem);			      \
     else if (sizeof (*(mem)) == 8)					      \
       __result = __arch_atomic_decrement_val_64 (mem);			      \
-    else 								      \
+    else								      \
        abort ();							      \
     __result;								      \
   })

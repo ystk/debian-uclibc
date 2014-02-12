@@ -35,6 +35,9 @@
 #include "semaphore.h"
 #include "debug.h" /* PDEBUG, added by StS */
 
+#ifndef THREAD_STACK_OFFSET
+#define THREAD_STACK_OFFSET 0
+#endif
 
 /* poll() is not supported in kernel <= 2.0, therefore is __NR_poll is
  * not available, we assume an old Linux kernel is in use and we will
@@ -137,7 +140,7 @@ int attribute_noreturn __pthread_manager(void *arg)
 #endif /* __UCLIBC_HAS_XLOCALE__ */
 
   /* Block all signals except __pthread_sig_cancel and SIGTRAP */
-  sigfillset(&manager_mask);
+  __sigfillset(&manager_mask);
   sigdelset(&manager_mask, __pthread_sig_cancel); /* for thread termination */
   sigdelset(&manager_mask, SIGTRAP);            /* for debugging purposes */
   if (__pthread_threads_debug && __pthread_sig_debug > 0)
@@ -146,7 +149,7 @@ int attribute_noreturn __pthread_manager(void *arg)
   /* Raise our priority to match that of main thread */
   __pthread_manager_adjust_prio(__pthread_main_thread->p_priority);
   /* Synchronize debugging of the thread manager */
-  n = TEMP_FAILURE_RETRY(__libc_read(reqfd, (char *)&request,
+  n = TEMP_FAILURE_RETRY(read(reqfd, (char *)&request,
 				     sizeof(request)));
 #ifndef USE_SELECT
   ufd.fd = reqfd;
@@ -183,9 +186,9 @@ int attribute_noreturn __pthread_manager(void *arg)
 #endif
     {
 
-      PDEBUG("before __libc_read\n");
-      n = __libc_read(reqfd, (char *)&request, sizeof(request));
-      PDEBUG("after __libc_read, n=%d\n", n);
+      PDEBUG("before read\n");
+      n = read(reqfd, (char *)&request, sizeof(request));
+      PDEBUG("after read, n=%d\n", n);
       switch(request.req_kind) {
       case REQ_CREATE:
         PDEBUG("got REQ_CREATE\n");
@@ -198,7 +201,7 @@ int attribute_noreturn __pthread_manager(void *arg)
                                 request.req_thread->p_pid,
                                 request.req_thread->p_report_events,
                                 &request.req_thread->p_eventbuf.eventmask);
-        PDEBUG("restarting %d\n", request.req_thread);
+        PDEBUG("restarting %p\n", request.req_thread);
         restart(request.req_thread);
         break;
       case REQ_FREE:
@@ -206,7 +209,7 @@ int attribute_noreturn __pthread_manager(void *arg)
         pthread_handle_free(request.req_args.free.thread_id);
         break;
       case REQ_PROCESS_EXIT:
-        PDEBUG("got REQ_PROCESS_EXIT from %d, exit code = %d\n",
+        PDEBUG("got REQ_PROCESS_EXIT from %p, exit code = %d\n",
         request.req_thread, request.req_args.exit.code);
         pthread_handle_exit(request.req_thread,
                             request.req_args.exit.code);
@@ -236,7 +239,7 @@ int attribute_noreturn __pthread_manager(void *arg)
 	/* Make gdb aware of new thread and gdb will restart the
 	   new thread when it is ready to handle the new thread. */
 	if (__pthread_threads_debug && __pthread_sig_debug > 0) {
-      PDEBUG("about to call raise(__pthread_sig_debug)\n");
+	  PDEBUG("about to call raise(__pthread_sig_debug)\n");
 	  raise(__pthread_sig_debug);
 	}
       case REQ_KICK:
@@ -248,7 +251,7 @@ int attribute_noreturn __pthread_manager(void *arg)
   }
 }
 
-int __pthread_manager_event(void *arg)
+int attribute_noreturn __pthread_manager_event(void *arg)
 {
   /* If we have special thread_self processing, initialize it.  */
 #ifdef INIT_THREAD_SELF
@@ -260,7 +263,7 @@ int __pthread_manager_event(void *arg)
   /* Free it immediately.  */
   __pthread_unlock (THREAD_GETMEM((&__pthread_manager_thread), p_lock));
 
-  return __pthread_manager(arg);
+  __pthread_manager(arg);
 }
 
 /* Process creation */
@@ -301,7 +304,7 @@ pthread_start_thread(void *arg)
   if (__pthread_threads_debug && __pthread_sig_debug > 0) {
     request.req_thread = self;
     request.req_kind = REQ_DEBUG;
-    TEMP_FAILURE_RETRY(__libc_write(__pthread_manager_request,
+    TEMP_FAILURE_RETRY(write(__pthread_manager_request,
 		(char *) &request, sizeof(request)));
     suspend(self);
   }
@@ -349,8 +352,7 @@ static int pthread_allocate_stack(const pthread_attr_t *attr,
   if (attr != NULL && attr->__stackaddr_set)
     {
       /* The user provided a stack. */
-      new_thread =
-        (pthread_descr) ((long)(attr->__stackaddr) & -sizeof(void *)) - 1;
+      new_thread = (pthread_descr) ((long)(attr->__stackaddr) & -sizeof(void *)) - 1;
       new_thread_bottom = (char *) attr->__stackaddr - attr->__stacksize;
       guardaddr = NULL;
       guardsize = 0;
@@ -368,7 +370,7 @@ static int pthread_allocate_stack(const pthread_attr_t *attr,
 #ifdef __ARCH_USE_MMU__
       stacksize = STACK_SIZE - pagesize;
       if (attr != NULL)
-        stacksize = MIN (stacksize, roundup(attr->__stacksize, pagesize));
+        stacksize = MIN(stacksize, roundup(attr->__stacksize, pagesize));
       /* Allocate space for stack and thread descriptor at default address */
       new_thread = default_new_thread;
       new_thread_bottom = (char *) (new_thread + 1) - stacksize;
@@ -394,7 +396,7 @@ static int pthread_allocate_stack(const pthread_attr_t *attr,
           /* Put a bad page at the bottom of the stack */
           guardsize = attr->__guardsize;
           guardaddr = (void *)new_thread_bottom - guardsize;
-          if (mmap ((caddr_t) guardaddr, guardsize, 0, MAP_FIXED, -1, 0)
+          if (mmap((caddr_t) guardaddr, guardsize, 0, MAP_FIXED, -1, 0)
               == MAP_FAILED)
             {
               /* We don't make this an error.  */
@@ -477,6 +479,7 @@ static int pthread_handle_create(pthread_t *thread, const pthread_attr_t *attr,
   int pid;
   pthread_descr new_thread;
   char * new_thread_bottom;
+  char * new_thread_top;
   pthread_t new_thread_id;
   char *guardaddr = NULL;
   size_t guardsize = 0;
@@ -562,7 +565,7 @@ static int pthread_handle_create(pthread_t *thread, const pthread_attr_t *attr,
   /* Do the cloning.  We have to use two different functions depending
      on whether we are debugging or not.  */
   pid = 0;     /* Note that the thread never can have PID zero.  */
-
+  new_thread_top = ((char *)new_thread - THREAD_STACK_OFFSET);
 
   /* ******************************************************** */
   /*  This code was moved from below to cope with running threads
@@ -579,9 +582,9 @@ static int pthread_handle_create(pthread_t *thread, const pthread_attr_t *attr,
       /* See whether the TD_CREATE event bit is set in any of the
          masks.  */
       int idx = __td_eventword (TD_CREATE);
-      uint32_t mask = __td_eventmask (TD_CREATE);
+      uint32_t m = __td_eventmask (TD_CREATE);
 
-      if ((mask & (__pthread_threads_events.event_bits[idx]
+      if ((m & (__pthread_threads_events.event_bits[idx]
 		   | event_maskp->event_bits[idx])) != 0)
 	{
 	  /* Lock the mutex the child will use now so that it will stop.  */
@@ -589,12 +592,12 @@ static int pthread_handle_create(pthread_t *thread, const pthread_attr_t *attr,
 
 	  /* We have to report this event.  */
 #ifdef __ia64__
-	  pid = __clone2(pthread_start_thread_event, (void **) new_thread,
-			(char *)new_thread - new_thread_bottom,
+	  pid = __clone2(pthread_start_thread_event, new_thread_top,
+			new_thread_top - new_thread_bottom,
 			CLONE_VM | CLONE_FS | CLONE_FILES | CLONE_SIGHAND |
 			__pthread_sig_cancel, new_thread);
 #else
-	  pid = clone(pthread_start_thread_event, (void **) new_thread,
+	  pid = clone(pthread_start_thread_event, new_thread_top,
 			CLONE_VM | CLONE_FS | CLONE_FILES | CLONE_SIGHAND |
 			__pthread_sig_cancel, new_thread);
 #endif
@@ -627,12 +630,12 @@ static int pthread_handle_create(pthread_t *thread, const pthread_attr_t *attr,
     {
       PDEBUG("cloning new_thread = %p\n", new_thread);
 #ifdef __ia64__
-      pid = __clone2(pthread_start_thread, (void **) new_thread,
-			(char *)new_thread - new_thread_bottom,
+      pid = __clone2(pthread_start_thread, new_thread_top,
+		    new_thread_top - new_thread_bottom,
 		    CLONE_VM | CLONE_FS | CLONE_FILES | CLONE_SIGHAND |
 		    __pthread_sig_cancel, new_thread);
 #else
-      pid = clone(pthread_start_thread, (void **) new_thread,
+      pid = clone(pthread_start_thread, new_thread_top,
 		    CLONE_VM | CLONE_FS | CLONE_FILES | CLONE_SIGHAND |
 		    __pthread_sig_cancel, new_thread);
 #endif
@@ -808,7 +811,7 @@ static void pthread_reap_children(void)
   int status;
   PDEBUG("\n");
 
-  while ((pid = __libc_waitpid(-1, &status, WNOHANG | __WCLONE)) > 0) {
+  while ((pid = waitpid(-1, &status, WNOHANG | __WCLONE)) > 0) {
     pthread_exited(pid);
     if (WIFSIGNALED(status)) {
       /* If a thread died due to a signal, send the same signal to
@@ -907,7 +910,7 @@ void __pthread_manager_sighandler(int sig attribute_unused)
 	struct pthread_request request;
 	request.req_thread = 0;
 	request.req_kind = REQ_KICK;
-	TEMP_FAILURE_RETRY(__libc_write(__pthread_manager_request,
+	TEMP_FAILURE_RETRY(write(__pthread_manager_request,
 		    (char *) &request, sizeof(request)));
     }
 }

@@ -68,9 +68,6 @@ weak_alias(__libc_pwrite64,pwrite64)
 
 
 #if ! defined __NR_pread || ! defined __NR_pwrite
-libc_hidden_proto(read)
-libc_hidden_proto(write)
-libc_hidden_proto(lseek)
 
 static ssize_t __fake_pread_write(int fd, void *buf,
 		size_t count, off_t offset, int do_pwrite)
@@ -110,7 +107,6 @@ static ssize_t __fake_pread_write(int fd, void *buf,
 }
 
 # ifdef __UCLIBC_HAS_LFS__
-libc_hidden_proto(lseek64)
 
 static ssize_t __fake_pread_write64(int fd, void *buf,
 		size_t count, off64_t offset, int do_pwrite)
@@ -150,6 +146,7 @@ static ssize_t __fake_pread_write64(int fd, void *buf,
 #endif /*  ! defined __NR_pread || ! defined __NR_pwrite */
 
 #ifndef __NR_pread
+ssize_t __libc_pread(int fd, void *buf, size_t count, off_t offset);
 ssize_t __libc_pread(int fd, void *buf, size_t count, off_t offset)
 {
 	return(__fake_pread_write(fd, buf, count, offset, 0));
@@ -157,6 +154,7 @@ ssize_t __libc_pread(int fd, void *buf, size_t count, off_t offset)
 weak_alias(__libc_pread,pread)
 
 # ifdef __UCLIBC_HAS_LFS__
+ssize_t __libc_pread64(int fd, void *buf, size_t count, off64_t offset);
 ssize_t __libc_pread64(int fd, void *buf, size_t count, off64_t offset)
 {
 	return(__fake_pread_write64(fd, buf, count, offset, 0));
@@ -167,6 +165,7 @@ weak_alias(__libc_pread64,pread64)
 
 
 #ifndef __NR_pwrite
+ssize_t __libc_pwrite(int fd, const void *buf, size_t count, off_t offset);
 ssize_t __libc_pwrite(int fd, const void *buf, size_t count, off_t offset)
 {
 	return(__fake_pread_write(fd, (void*)buf, count, offset, 1));
@@ -174,6 +173,7 @@ ssize_t __libc_pwrite(int fd, const void *buf, size_t count, off_t offset)
 weak_alias(__libc_pwrite,pwrite)
 
 # ifdef __UCLIBC_HAS_LFS__
+ssize_t __libc_pwrite64(int fd, const void *buf, size_t count, off64_t offset);
 ssize_t __libc_pwrite64(int fd, const void *buf, size_t count, off64_t offset)
 {
 	return(__fake_pread_write64(fd, (void*)buf, count, offset, 1));

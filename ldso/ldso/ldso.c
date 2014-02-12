@@ -38,28 +38,35 @@
 
 #define ALLOW_ZERO_PLTGOT
 
+#if defined(USE_TLS) && USE_TLS
+#include "dl-tls.c"
+#endif
+
 /* Pull in the value of _dl_progname */
 #include LDSO_ELFINTERP
 
 /* Global variables used within the shared library loader */
-char *_dl_library_path         = 0;	/* Where we look for libraries */
-char *_dl_preload              = 0;	/* Things to be loaded before the libs */
-char *_dl_ldsopath             = 0;	/* Location of the shared lib loader */
-int _dl_secure                 = 1;	/* Are we dealing with setuid stuff? */
+char *_dl_library_path         = NULL;	/* Where we look for libraries */
+#ifdef __LDSO_PRELOAD_ENV_SUPPORT__
+char *_dl_preload              = NULL;	/* Things to be loaded before the libs */
+#endif
+char *_dl_ldsopath             = NULL;	/* Location of the shared lib loader */
 int _dl_errno                  = 0;	/* We can't use the real errno in ldso */
 size_t _dl_pagesize            = 0;	/* Store the page size for use later */
 struct r_debug *_dl_debug_addr = NULL;	/* Used to communicate with the gdb debugger */
 void *(*_dl_malloc_function) (size_t size) = NULL;
 void (*_dl_free_function) (void *p) = NULL;
 
+static int _dl_secure = 1; /* Are we dealing with setuid stuff? */
+
 #ifdef __SUPPORT_LD_DEBUG__
-char *_dl_debug           = 0;
-char *_dl_debug_symbols   = 0;
-char *_dl_debug_move      = 0;
-char *_dl_debug_reloc     = 0;
-char *_dl_debug_detail    = 0;
-char *_dl_debug_nofixups  = 0;
-char *_dl_debug_bindings  = 0;
+char *_dl_debug           = NULL;
+char *_dl_debug_symbols   = NULL;
+char *_dl_debug_move      = NULL;
+char *_dl_debug_reloc     = NULL;
+char *_dl_debug_detail    = NULL;
+char *_dl_debug_nofixups  = NULL;
+char *_dl_debug_bindings  = NULL;
 int   _dl_debug_file      = 2;
 #endif
 
@@ -69,8 +76,6 @@ const char *_dl_progname = UCLIBC_LDSO;      /* The name of the executable being
 #include "dl-startup.c"
 #include "dl-symbols.c"
 #include "dl-array.c"
-/* Forward function declarations */
-static int _dl_suid_ok(void);
 
 /*
  * This stub function is used by some debuggers.  The idea is that they
@@ -88,8 +93,8 @@ void _dl_debug_state(void)
 }
 rtld_hidden_def(_dl_debug_state);
 
-static unsigned char *_dl_malloc_addr = 0;	/* Lets _dl_malloc use the already allocated memory page */
-static unsigned char *_dl_mmap_zero   = 0;	/* Also used by _dl_malloc */
+static unsigned char *_dl_malloc_addr = NULL;	/* Lets _dl_malloc use the already allocated memory page */
+static unsigned char *_dl_mmap_zero   = NULL;	/* Also used by _dl_malloc */
 
 static struct elf_resolve **init_fini_list;
 static unsigned int nlist; /* # items in init_fini_list */
@@ -106,6 +111,144 @@ uintptr_t __stack_chk_guard attribute_relro;
 # ifdef __UCLIBC_HAS_SSP_COMPAT__
 uintptr_t __guard attribute_relro;
 # endif
+#endif
+
+char *_dl_getenv(const char *symbol, char **envp)
+{
+	char *pnt;
+	const char *pnt1;
+
+	while ((pnt = *envp++)) {
+		pnt1 = symbol;
+		while (*pnt && *pnt == *pnt1)
+			pnt1++, pnt++;
+		if (!*pnt || *pnt != '=' || *pnt1)
+			continue;
+		return pnt + 1;
+	}
+	return 0;
+}
+
+void _dl_unsetenv(const char *symbol, char **envp)
+{
+	char *pnt;
+	const char *pnt1;
+	char **newenvp = envp;
+
+	for (pnt = *envp; pnt; pnt = *++envp) {
+		pnt1 = symbol;
+		while (*pnt && *pnt == *pnt1)
+			pnt1++, pnt++;
+		if (!*pnt || *pnt != '=' || *pnt1)
+			*newenvp++ = *envp;
+	}
+	*newenvp++ = *envp;
+	return;
+}
+
+static int _dl_suid_ok(void)
+{
+	__kernel_uid_t uid, euid;
+	__kernel_gid_t gid, egid;
+
+	uid = _dl_getuid();
+	euid = _dl_geteuid();
+	gid = _dl_getgid();
+	egid = _dl_getegid();
+
+	if (uid == euid && gid == egid) {
+		return 1;
+	}
+	return 0;
+}
+
+void *_dl_malloc(size_t size)
+{
+	void *retval;
+
+#if 0
+	_dl_debug_early("request for %d bytes\n", size);
+#endif
+
+	if (_dl_malloc_function)
+		return (*_dl_malloc_function) (size);
+
+	if (_dl_malloc_addr - _dl_mmap_zero + size > _dl_pagesize) {
+		size_t rounded_size;
+
+		/* Since the above assumes we get a full page even if
+		   we request less than that, make sure we request a
+		   full page, since uClinux may give us less than than
+		   a full page.  We might round even
+		   larger-than-a-page sizes, but we end up never
+		   reusing _dl_mmap_zero/_dl_malloc_addr in that case,
+		   so we don't do it.
+
+		   The actual page size doesn't really matter; as long
+		   as we're self-consistent here, we're safe.  */
+		if (size < _dl_pagesize)
+			rounded_size = (size + ADDR_ALIGN) & _dl_pagesize;
+		else
+			rounded_size = size;
+
+		_dl_debug_early("mmapping more memory\n");
+		_dl_mmap_zero = _dl_malloc_addr = _dl_mmap((void *) 0, rounded_size,
+				PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_UNINITIALIZE, -1, 0);
+		if (_dl_mmap_check_error(_dl_mmap_zero)) {
+			_dl_dprintf(_dl_debug_file, "%s: mmap of a spare page failed!\n", _dl_progname);
+			_dl_exit(20);
+		}
+	}
+	retval = _dl_malloc_addr;
+	_dl_malloc_addr += size;
+
+	/*
+	 * Align memory to DL_MALLOC_ALIGN byte boundary.  Some
+	 * platforms require this, others simply get better
+	 * performance.
+	 */
+	_dl_malloc_addr = (unsigned char *) (((unsigned long) _dl_malloc_addr + DL_MALLOC_ALIGN - 1) & ~(DL_MALLOC_ALIGN - 1));
+	return retval;
+}
+
+static void *_dl_zalloc(size_t size)
+{
+	void *p = _dl_malloc(size);
+	if (p)
+		_dl_memset(p, 0, size);
+	return p;
+}
+
+void _dl_free(void *p)
+{
+	if (_dl_free_function)
+		(*_dl_free_function) (p);
+}
+
+#if defined(USE_TLS) && USE_TLS
+void *_dl_memalign(size_t __boundary, size_t __size)
+{
+	void *result;
+	int i = 0;
+	size_t delta;
+	size_t rounded = 0;
+
+	if (_dl_memalign_function)
+		return (*_dl_memalign_function) (__boundary, __size);
+
+	while (rounded < __boundary) {
+		rounded = (1 << i++);
+	}
+
+	delta = (((size_t) _dl_malloc_addr + __size) & (rounded - 1));
+
+	if ((result = _dl_malloc(rounded - delta)) == NULL)
+		return result;
+
+	result = _dl_malloc(__size);
+
+	return result;
+}
 #endif
 
 static void __attribute__ ((destructor)) __attribute_used__ _dl_fini(void)
@@ -151,12 +294,15 @@ void _dl_get_ready_to_run(struct elf_resolve *tpnt, DL_LOADADDR_TYPE load_addr,
 	ElfW(Addr) relro_addr = 0;
 	size_t relro_size = 0;
 	struct stat st;
+#if defined(USE_TLS) && USE_TLS
+	void *tcbp = NULL;
+#endif
 
 	/* Wahoo!!! We managed to make a function call!  Get malloc
 	 * setup so we can use _dl_dprintf() to print debug noise
 	 * instead of the SEND_STDERR macros used in dl-startup.c */
 
-	_dl_memset(app_tpnt, 0x00, sizeof(*app_tpnt));
+	_dl_memset(app_tpnt, 0, sizeof(*app_tpnt));
 
 	/* Store the page size for later use */
 	_dl_pagesize = (auxvt[AT_PAGESZ].a_un.a_val) ? (size_t) auxvt[AT_PAGESZ].a_un.a_val : PAGE_SIZE;
@@ -202,7 +348,9 @@ void _dl_get_ready_to_run(struct elf_resolve *tpnt, DL_LOADADDR_TYPE load_addr,
 	     auxvt[AT_UID].a_un.a_val == auxvt[AT_EUID].a_un.a_val &&
 	     auxvt[AT_GID].a_un.a_val == auxvt[AT_EGID].a_un.a_val)) {
 		_dl_secure = 0;
+#ifdef __LDSO_PRELOAD_ENV_SUPPORT__
 		_dl_preload = _dl_getenv("LD_PRELOAD", envp);
+#endif
 		_dl_library_path = _dl_getenv("LD_LIBRARY_PATH", envp);
 	} else {
 		static const char unsecure_envvars[] =
@@ -217,26 +365,19 @@ void _dl_get_ready_to_run(struct elf_resolve *tpnt, DL_LOADADDR_TYPE load_addr,
 		do {
 			_dl_unsetenv (nextp, envp);
 			/* We could use rawmemchr but this need not be fast.  */
-			nextp = (char *) _dl_strchr(nextp, '\0') + 1;
+			nextp = _dl_strchr(nextp, '\0') + 1;
 		} while (*nextp != '\0');
+#ifdef __LDSO_PRELOAD_ENV_SUPPORT__
 		_dl_preload = NULL;
+#endif
 		_dl_library_path = NULL;
 		/* SUID binaries can be exploited if they do LAZY relocation. */
 		unlazy = RTLD_NOW;
 	}
 
-	/* sjhill: your TLS init should go before this */
-#ifdef __UCLIBC_HAS_SSP__
-	/* Set up the stack checker's canary.  */
-	stack_chk_guard = _dl_setup_stack_chk_guard ();
-# ifdef THREAD_SET_STACK_GUARD
-	THREAD_SET_STACK_GUARD (stack_chk_guard);
-# else
-	__stack_chk_guard = stack_chk_guard;
-# endif
-# ifdef __UCLIBC_HAS_SSP_COMPAT__
-	__guard = stack_chk_guard;
-# endif
+#if defined(USE_TLS) && USE_TLS
+	_dl_error_catch_tsd = &_dl_initial_error_catch_tsd;
+	_dl_init_static_tls = &_dl_nothread_init_static_tls;
 #endif
 
 	/* At this point we are now free to examine the user application,
@@ -267,8 +408,7 @@ void _dl_get_ready_to_run(struct elf_resolve *tpnt, DL_LOADADDR_TYPE load_addr,
 	 * This is used by gdb to locate the chain of shared libraries that are
 	 * currently loaded.
 	 */
-	debug_addr = _dl_malloc(sizeof(struct r_debug));
-	_dl_memset(debug_addr, 0, sizeof(struct r_debug));
+	debug_addr = _dl_zalloc(sizeof(struct r_debug));
 
 	ppnt = (ElfW(Phdr) *) auxvt[AT_PHDR].a_un.a_val;
 	for (i = 0; i < auxvt[AT_PHNUM].a_un.a_val; i++, ppnt++) {
@@ -322,8 +462,7 @@ void _dl_get_ready_to_run(struct elf_resolve *tpnt, DL_LOADADDR_TYPE load_addr,
 			_dl_loaded_modules->libtype = elf_executable;
 			_dl_loaded_modules->ppnt = (ElfW(Phdr) *) auxvt[AT_PHDR].a_un.a_val;
 			_dl_loaded_modules->n_phent = auxvt[AT_PHNUM].a_un.a_val;
-			_dl_symbol_tables = rpnt = (struct dyn_elf *) _dl_malloc(sizeof(struct dyn_elf));
-			_dl_memset(rpnt, 0, sizeof(struct dyn_elf));
+			_dl_symbol_tables = rpnt = _dl_zalloc(sizeof(struct dyn_elf));
 			rpnt->dyn = _dl_loaded_modules;
 			app_tpnt->mapaddr = app_mapaddr;
 			app_tpnt->rtld_flags = unlazy | RTLD_GLOBAL;
@@ -338,23 +477,64 @@ void _dl_get_ready_to_run(struct elf_resolve *tpnt, DL_LOADADDR_TYPE load_addr,
 
 		/* OK, fill this in - we did not have this before */
 		if (ppnt->p_type == PT_INTERP) {
-			char *ptmp;
-
 			tpnt->libname = (char *) DL_RELOC_ADDR(app_tpnt->loadaddr, ppnt->p_vaddr);
-
-			/* Store the path where the shared lib loader was found
-			 * for later use
-			 */
-			_dl_ldsopath = _dl_strdup(tpnt->libname);
-			ptmp = _dl_strrchr(_dl_ldsopath, '/');
-			if (ptmp != _dl_ldsopath)
-				*ptmp = '\0';
-
+#ifdef __LDSO_SEARCH_INTERP_PATH__
+			{
+				char *ptmp;
+				/* Store the path where the shared lib loader was found
+				 * for later use
+				 */
+				_dl_ldsopath = _dl_strdup(tpnt->libname);
+				ptmp = _dl_strrchr(_dl_ldsopath, '/');
+				if (ptmp != _dl_ldsopath)
+					*ptmp = '\0';
+			}
 			_dl_debug_early("Lib Loader: (%x) %s\n", (unsigned) DL_LOADADDR_BASE(tpnt->loadaddr), tpnt->libname);
+#endif
+		}
+
+		/* Discover any TLS sections if the target supports them. */
+		if (ppnt->p_type == PT_TLS) {
+#if defined(USE_TLS) && USE_TLS
+			if (ppnt->p_memsz > 0) {
+				app_tpnt->l_tls_blocksize = ppnt->p_memsz;
+				app_tpnt->l_tls_align = ppnt->p_align;
+				if (ppnt->p_align == 0)
+					app_tpnt->l_tls_firstbyte_offset = 0;
+				else
+					app_tpnt->l_tls_firstbyte_offset =
+						(ppnt->p_vaddr & (ppnt->p_align - 1));
+				app_tpnt->l_tls_initimage_size = ppnt->p_filesz;
+				app_tpnt->l_tls_initimage = (void *) ppnt->p_vaddr;
+
+				/* This image gets the ID one.  */
+				_dl_tls_max_dtv_idx = app_tpnt->l_tls_modid = 1;
+
+			}
+			_dl_debug_early("Found TLS header for appplication program\n");
+			break;
+#else
+			_dl_dprintf(_dl_debug_file, "Program uses unsupported TLS data!\n");
+			_dl_exit(1);
+#endif
 		}
 	}
 	app_tpnt->relro_addr = relro_addr;
 	app_tpnt->relro_size = relro_size;
+
+#if defined(USE_TLS) && USE_TLS
+	/*
+	 * Adjust the address of the TLS initialization image in
+	 * case the executable is actually an ET_DYN object.
+	 */
+	if (app_tpnt->l_tls_initimage != NULL) {
+		app_tpnt->l_tls_initimage =
+			(char *) app_tpnt->l_tls_initimage + app_tpnt->loadaddr;
+		_dl_debug_early("Relocated TLS initial image from %x to %x (size = %x)\n",
+			(unsigned int)app_tpnt->l_tls_initimage,
+			app_tpnt->l_tls_initimage, app_tpnt->l_tls_initimage_size);
+	}
+#endif
 
 #ifdef __SUPPORT_LD_DEBUG__
 	_dl_debug = _dl_getenv("LD_DEBUG", envp);
@@ -387,14 +567,14 @@ void _dl_get_ready_to_run(struct elf_resolve *tpnt, DL_LOADADDR_TYPE load_addr,
 			len1 = _dl_strlen(dl_debug_output);
 			len2 = _dl_strlen(tmp1);
 
-			filename = _dl_malloc(len1+len2+2);
+			filename = _dl_malloc(len1 + len2 + 2);
 
 			if (filename) {
 				_dl_strcpy (filename, dl_debug_output);
 				filename[len1] = '.';
 				_dl_strcpy (&filename[len1+1], tmp1);
 
-				_dl_debug_file= _dl_open(filename, O_WRONLY|O_CREAT, 0644);
+				_dl_debug_file = _dl_open(filename, O_WRONLY|O_CREAT, 0644);
 				if (_dl_debug_file < 0) {
 					_dl_debug_file = 2;
 					_dl_dprintf(_dl_debug_file, "can't open file: '%s'\n",filename);
@@ -436,6 +616,7 @@ void _dl_get_ready_to_run(struct elf_resolve *tpnt, DL_LOADADDR_TYPE load_addr,
 
 	_dl_map_cache();
 
+#ifdef __LDSO_PRELOAD_ENV_SUPPORT__
 	if (_dl_preload) {
 		char c, *str, *str2;
 
@@ -491,6 +672,7 @@ void _dl_get_ready_to_run(struct elf_resolve *tpnt, DL_LOADADDR_TYPE load_addr,
 				str++;
 		}
 	}
+#endif /* __LDSO_PRELOAD_ENV_SUPPORT__ */
 
 #ifdef __LDSO_PRELOAD_FILE_SUPPORT__
 	do {
@@ -545,11 +727,11 @@ void _dl_get_ready_to_run(struct elf_resolve *tpnt, DL_LOADADDR_TYPE load_addr,
 
 			tpnt1 = _dl_load_shared_library(0, &rpnt, NULL, cp2, trace_loaded_objects);
 			if (!tpnt1) {
-#ifdef __LDSO_LDD_SUPPORT__
+# ifdef __LDSO_LDD_SUPPORT__
 				if (trace_loaded_objects)
 					_dl_dprintf(1, "\t%s => not found\n", cp2);
 				else
-#endif
+# endif
 				{
 					_dl_dprintf(_dl_debug_file, "%s: can't load library '%s'\n", _dl_progname, cp2);
 					_dl_exit(15);
@@ -559,14 +741,14 @@ void _dl_get_ready_to_run(struct elf_resolve *tpnt, DL_LOADADDR_TYPE load_addr,
 
 				_dl_debug_early("Loading: (%x) %s\n", DL_LOADADDR_BASE(tpnt1->loadaddr), tpnt1->libname);
 
-#ifdef __LDSO_LDD_SUPPORT__
+# ifdef __LDSO_LDD_SUPPORT__
 				if (trace_loaded_objects &&
 				    tpnt1->usage_count == 1) {
 					_dl_dprintf(1, "\t%s => %s (%x)\n",
 						    cp2, tpnt1->libname,
 						    DL_LOADADDR_BASE(tpnt1->loadaddr));
 				}
-#endif
+# endif
 			}
 
 			/* find start of next library */
@@ -686,7 +868,16 @@ void _dl_get_ready_to_run(struct elf_resolve *tpnt, DL_LOADADDR_TYPE load_addr,
 		ElfW(Ehdr) *epnt = (ElfW(Ehdr) *) auxvt[AT_BASE].a_un.a_val;
 		ElfW(Phdr) *myppnt = (ElfW(Phdr) *) DL_RELOC_ADDR(load_addr, epnt->e_phoff);
 		int j;
+#ifdef __DSBT__
+		struct elf_resolve *ref = _dl_loaded_modules;
+		_dl_if_debug_dprint("ref is %x, dsbt %x, ref-dsbt %x size %x\n",
+				    ref, tpnt->loadaddr.map->dsbt_table,
+				    ref->loadaddr.map->dsbt_table,
+				    tpnt->loadaddr.map->dsbt_size);
 
+		_dl_memcpy(tpnt->loadaddr.map->dsbt_table, ref->loadaddr.map->dsbt_table,
+			   tpnt->loadaddr.map->dsbt_size * sizeof(unsigned *));
+#endif
 		tpnt = _dl_add_elf_hash_table(tpnt->libname, load_addr,
 					      tpnt->dynamic_info,
 					      (unsigned long)tpnt->dynamic_addr,
@@ -709,13 +900,11 @@ void _dl_get_ready_to_run(struct elf_resolve *tpnt, DL_LOADADDR_TYPE load_addr,
 		tpnt->usage_count++;
 		tpnt->symbol_scope = _dl_symbol_tables;
 		if (rpnt) {
-			rpnt->next = (struct dyn_elf *) _dl_malloc(sizeof(struct dyn_elf));
-			_dl_memset(rpnt->next, 0, sizeof(struct dyn_elf));
+			rpnt->next = _dl_zalloc(sizeof(struct dyn_elf));
 			rpnt->next->prev = rpnt;
 			rpnt = rpnt->next;
 		} else {
-			rpnt = (struct dyn_elf *) _dl_malloc(sizeof(struct dyn_elf));
-			_dl_memset(rpnt, 0, sizeof(struct dyn_elf));
+			rpnt = _dl_zalloc(sizeof(struct dyn_elf));
 		}
 		rpnt->dyn = tpnt;
 		tpnt->rtld_flags = RTLD_NOW | RTLD_GLOBAL; /* Must not be LAZY */
@@ -743,6 +932,34 @@ void _dl_get_ready_to_run(struct elf_resolve *tpnt, DL_LOADADDR_TYPE load_addr,
 	}
 #endif
 
+#if defined(USE_TLS) && USE_TLS
+	/* We do not initialize any of the TLS functionality unless any of the
+	 * initial modules uses TLS.  This makes dynamic loading of modules with
+	 * TLS impossible, but to support it requires either eagerly doing setup
+	 * now or lazily doing it later.  Doing it now makes us incompatible with
+	 * an old kernel that can't perform TLS_INIT_TP, even if no TLS is ever
+	 * used.  Trying to do it lazily is too hairy to try when there could be
+	 * multiple threads (from a non-TLS-using libpthread).  */
+	bool was_tls_init_tp_called = tls_init_tp_called;
+	if (tcbp == NULL) {
+		_dl_debug_early("Calling init_tls()!\n");
+		tcbp = init_tls ();
+	}
+#endif
+#ifdef __UCLIBC_HAS_SSP__
+	/* Set up the stack checker's canary.  */
+	stack_chk_guard = _dl_setup_stack_chk_guard ();
+# ifdef THREAD_SET_STACK_GUARD
+	THREAD_SET_STACK_GUARD (stack_chk_guard);
+# else
+	__stack_chk_guard = stack_chk_guard;
+# endif
+# ifdef __UCLIBC_HAS_SSP_COMPAT__
+	__guard = stack_chk_guard;
+# endif
+#endif
+
+
 	_dl_debug_early("Beginning relocation fixups\n");
 
 #ifdef __mips__
@@ -768,6 +985,28 @@ void _dl_get_ready_to_run(struct elf_resolve *tpnt, DL_LOADADDR_TYPE load_addr,
 			_dl_protect_relro (tpnt);
 	}
 
+#if defined(USE_TLS) && USE_TLS
+	if (!was_tls_init_tp_called && _dl_tls_max_dtv_idx > 0)
+		++_dl_tls_generation;
+
+	_dl_debug_early("Calling _dl_allocate_tls_init()!\n");
+
+	/* Now that we have completed relocation, the initializer data
+	   for the TLS blocks has its final values and we can copy them
+	   into the main thread's TLS area, which we allocated above.  */
+	_dl_allocate_tls_init (tcbp);
+
+	/* And finally install it for the main thread.  If ld.so itself uses
+	   TLS we know the thread pointer was initialized earlier.  */
+	if (! tls_init_tp_called) {
+		const char *lossage = (char *) TLS_INIT_TP (tcbp, USE___THREAD);
+		if (__builtin_expect (lossage != NULL, 0)) {
+			_dl_debug_early("cannot set up thread-local storage: %s\n", lossage);
+			_dl_exit(30);
+		}
+	}
+#endif /* USE_TLS */
+
 	/* OK, at this point things are pretty much ready to run.  Now we need
 	 * to touch up a few items that are required, and then we can let the
 	 * user application have at it.  Note that the dynamic linker itself
@@ -775,7 +1014,7 @@ void _dl_get_ready_to_run(struct elf_resolve *tpnt, DL_LOADADDR_TYPE load_addr,
 	 * ld.so.1, so we have to look up each symbol individually.
 	 */
 
-	_dl_envp = (unsigned long *) (intptr_t) _dl_find_hash(__C_SYMBOL_PREFIX__ "__environ", _dl_symbol_tables, NULL, 0);
+	_dl_envp = (unsigned long *) (intptr_t) _dl_find_hash(__C_SYMBOL_PREFIX__ "__environ", _dl_symbol_tables, NULL, 0, NULL);
 	if (_dl_envp)
 		*_dl_envp = (unsigned long) envp;
 
@@ -831,115 +1070,27 @@ void _dl_get_ready_to_run(struct elf_resolve *tpnt, DL_LOADADDR_TYPE load_addr,
 
 	/* Find the real malloc function and make ldso functions use that from now on */
 	_dl_malloc_function = (void* (*)(size_t)) (intptr_t) _dl_find_hash(__C_SYMBOL_PREFIX__ "malloc",
-			_dl_symbol_tables, NULL, ELF_RTYPE_CLASS_PLT);
+			_dl_symbol_tables, NULL, ELF_RTYPE_CLASS_PLT, NULL);
+
+#if defined(USE_TLS) && USE_TLS
+	/* Find the real functions and make ldso functions use them from now on */
+	_dl_calloc_function = (void* (*)(size_t, size_t)) (intptr_t)
+		_dl_find_hash(__C_SYMBOL_PREFIX__ "calloc", _dl_symbol_tables, NULL, ELF_RTYPE_CLASS_PLT, NULL);
+
+	_dl_realloc_function = (void* (*)(void *, size_t)) (intptr_t)
+		_dl_find_hash(__C_SYMBOL_PREFIX__ "realloc", _dl_symbol_tables, NULL, ELF_RTYPE_CLASS_PLT, NULL);
+
+	_dl_free_function = (void (*)(void *)) (intptr_t)
+		_dl_find_hash(__C_SYMBOL_PREFIX__ "free", _dl_symbol_tables, NULL, ELF_RTYPE_CLASS_PLT, NULL);
+
+	_dl_memalign_function = (void* (*)(size_t, size_t)) (intptr_t)
+		_dl_find_hash(__C_SYMBOL_PREFIX__ "memalign", _dl_symbol_tables, NULL, ELF_RTYPE_CLASS_PLT, NULL);
+
+#endif
 
 	/* Notify the debugger that all objects are now mapped in.  */
 	_dl_debug_addr->r_state = RT_CONSISTENT;
 	_dl_debug_state();
-}
-
-char *_dl_getenv(const char *symbol, char **envp)
-{
-	char *pnt;
-	const char *pnt1;
-
-	while ((pnt = *envp++)) {
-		pnt1 = symbol;
-		while (*pnt && *pnt == *pnt1)
-			pnt1++, pnt++;
-		if (!*pnt || *pnt != '=' || *pnt1)
-			continue;
-		return pnt + 1;
-	}
-	return 0;
-}
-
-void _dl_unsetenv(const char *symbol, char **envp)
-{
-	char *pnt;
-	const char *pnt1;
-	char **newenvp = envp;
-
-	for (pnt = *envp; pnt; pnt = *++envp) {
-		pnt1 = symbol;
-		while (*pnt && *pnt == *pnt1)
-			pnt1++, pnt++;
-		if (!*pnt || *pnt != '=' || *pnt1)
-			*newenvp++ = *envp;
-	}
-	*newenvp++ = *envp;
-	return;
-}
-
-static int _dl_suid_ok(void)
-{
-	__kernel_uid_t uid, euid;
-	__kernel_gid_t gid, egid;
-
-	uid = _dl_getuid();
-	euid = _dl_geteuid();
-	gid = _dl_getgid();
-	egid = _dl_getegid();
-
-	if (uid == euid && gid == egid) {
-		return 1;
-	}
-	return 0;
-}
-
-void *_dl_malloc(size_t size)
-{
-	void *retval;
-
-#if 0
-	_dl_debug_early("request for %d bytes\n", size);
-#endif
-
-	if (_dl_malloc_function)
-		return (*_dl_malloc_function) (size);
-
-	if (_dl_malloc_addr - _dl_mmap_zero + size > _dl_pagesize) {
-		size_t rounded_size;
-
-		/* Since the above assumes we get a full page even if
-		   we request less than that, make sure we request a
-		   full page, since uClinux may give us less than than
-		   a full page.  We might round even
-		   larger-than-a-page sizes, but we end up never
-		   reusing _dl_mmap_zero/_dl_malloc_addr in that case,
-		   so we don't do it.
-
-		   The actual page size doesn't really matter; as long
-		   as we're self-consistent here, we're safe.  */
-		if (size < _dl_pagesize)
-			rounded_size = (size + ADDR_ALIGN) & _dl_pagesize;
-		else
-			rounded_size = size;
-
-		_dl_debug_early("mmapping more memory\n");
-		_dl_mmap_zero = _dl_malloc_addr = _dl_mmap((void *) 0, rounded_size,
-				PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-		if (_dl_mmap_check_error(_dl_mmap_zero)) {
-			_dl_dprintf(_dl_debug_file, "%s: mmap of a spare page failed!\n", _dl_progname);
-			_dl_exit(20);
-		}
-	}
-	retval = _dl_malloc_addr;
-	_dl_malloc_addr += size;
-
-	/*
-	 * Align memory to DL_MALLOC_ALIGN byte boundary.  Some
-	 * platforms require this, others simply get better
-	 * performance.
-	 */
-	_dl_malloc_addr = (unsigned char *) (((unsigned long) _dl_malloc_addr + DL_MALLOC_ALIGN - 1) & ~(DL_MALLOC_ALIGN - 1));
-	return retval;
-}
-
-void _dl_free (void *p)
-{
-	if (_dl_free_function)
-		(*_dl_free_function) (p);
 }
 
 #include "dl-hash.c"

@@ -24,10 +24,6 @@
 #include <sys/mman.h>
 #include <bits/uClibc_mutex.h>
 
-libc_hidden_proto(mmap)
-libc_hidden_proto(sysconf)
-libc_hidden_proto(sbrk)
-libc_hidden_proto(abort)
 
 
 __UCLIBC_MUTEX_EXTERN(__malloc_lock);
@@ -353,16 +349,13 @@ __UCLIBC_MUTEX_EXTERN(__malloc_lock);
 #endif
 
 #ifdef __ARCH_USE_MMU__
-
-#define MMAP(addr, size, prot) \
- (mmap((addr), (size), (prot), MAP_PRIVATE|MAP_ANONYMOUS, 0, 0))
-
+# define _MAP_UNINITIALIZE 0
 #else
+# define _MAP_UNINITIALIZE MAP_UNINITIALIZE
+#endif
 
 #define MMAP(addr, size, prot) \
- (mmap((addr), (size), (prot), MAP_SHARED|MAP_ANONYMOUS, 0, 0))
-
-#endif
+ (mmap((addr), (size), (prot), MAP_PRIVATE|MAP_ANONYMOUS|_MAP_UNINITIALIZE, 0, 0))
 
 
 /* -----------------------  Chunk representations ----------------------- */

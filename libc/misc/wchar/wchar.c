@@ -97,7 +97,6 @@
  *
  * Manuel
  */
-
 #ifdef _LIBC
 #include <errno.h>
 #include <stddef.h>
@@ -120,7 +119,7 @@
 #endif
 #endif /* __UCLIBC_MJN3_ONLY__ */
 
-#define ENCODING		((__UCLIBC_CURLOCALE_DATA).encoding)
+#define ENCODING		(__UCLIBC_CURLOCALE->encoding)
 
 #define Cc2wc_IDX_SHIFT		__LOCALE_DATA_Cc2wc_IDX_SHIFT
 #define Cc2wc_ROW_LEN		__LOCALE_DATA_Cc2wc_ROW_LEN
@@ -171,14 +170,11 @@ extern size_t _wchar_utf8sntowcs(wchar_t *__restrict pwc, size_t wn,
 
 extern size_t _wchar_wcsntoutf8s(char *__restrict s, size_t n,
 					const wchar_t **__restrict src, size_t wn) attribute_hidden;
-
-#endif /* _LIBC */
+#endif
 /**********************************************************************/
 #ifdef L_btowc
 
-libc_hidden_proto(mbrtowc)
 
-libc_hidden_proto(btowc)
 wint_t btowc(int c)
 {
 #ifdef __CTYPE_HAS_8_BIT_LOCALES
@@ -190,24 +186,24 @@ wint_t btowc(int c)
 	if (c != EOF) {
 		*buf = (unsigned char) c;
 		mbstate.__mask = 0;		/* Initialize the mbstate. */
-		if (mbrtowc(&wc, buf, 1, &mbstate) <= 1) {
+		if (mbrtowc(&wc, (char*) buf, 1, &mbstate) <= 1) {
 			return wc;
 		}
 	}
 	return WEOF;
 
-#else  /*  __CTYPE_HAS_8_BIT_LOCALES */
+#else  /* !__CTYPE_HAS_8_BIT_LOCALES */
 
 #ifdef __UCLIBC_HAS_LOCALE__
 	assert((ENCODING == __ctype_encoding_7_bit)
 		   || (ENCODING == __ctype_encoding_utf8));
-#endif /* __UCLIBC_HAS_LOCALE__ */
+#endif
 
 	/* If we don't have 8-bit locale support, then this is trivial since
 	 * anything outside of 0-0x7f is illegal in C/POSIX and UTF-8 locales. */
 	return (((unsigned int)c) < 0x80) ? c : WEOF;
 
-#endif /*  __CTYPE_HAS_8_BIT_LOCALES */
+#endif /* !__CTYPE_HAS_8_BIT_LOCALES */
 }
 libc_hidden_def(btowc)
 
@@ -217,7 +213,6 @@ libc_hidden_def(btowc)
 
 /* Note: We completely ignore ps in all currently supported conversions. */
 
-libc_hidden_proto(wcrtomb)
 
 int wctob(wint_t c)
 {
@@ -225,7 +220,7 @@ int wctob(wint_t c)
 
 	unsigned char buf[MB_LEN_MAX];
 
-	return (wcrtomb(buf, c, NULL) == 1) ? *buf : EOF;
+	return (wcrtomb((char*) buf, c, NULL) == 1) ? *buf : EOF;
 
 #else  /*  __CTYPE_HAS_8_BIT_LOCALES */
 
@@ -248,7 +243,6 @@ int wctob(wint_t c)
 /**********************************************************************/
 #ifdef L_mbsinit
 
-libc_hidden_proto(mbsinit)
 int mbsinit(const mbstate_t *ps)
 {
 	return !ps || !ps->__mask;
@@ -259,9 +253,7 @@ libc_hidden_def(mbsinit)
 /**********************************************************************/
 #ifdef L_mbrlen
 
-libc_hidden_proto(mbrtowc)
 
-libc_hidden_proto(mbrlen)
 size_t mbrlen(const char *__restrict s, size_t n, mbstate_t *__restrict ps)
 {
 	static mbstate_t mbstate;	/* Rely on bss 0-init. */
@@ -274,9 +266,7 @@ libc_hidden_def(mbrlen)
 /**********************************************************************/
 #ifdef L_mbrtowc
 
-libc_hidden_proto(mbsnrtowcs)
 
-libc_hidden_proto(mbrtowc)
 size_t mbrtowc(wchar_t *__restrict pwc, const char *__restrict s,
 			   size_t n, mbstate_t *__restrict ps)
 {
@@ -296,7 +286,9 @@ size_t mbrtowc(wchar_t *__restrict pwc, const char *__restrict s,
 		s = empty_string;
 		n = 1;
 	} else if (*s == '\0') {
-    /* According to the ISO C 89 standard this is the expected behaviour.  */
+		if (pwc)
+			*pwc = '\0';
+	/* According to the ISO C 89 standard this is the expected behaviour.  */
 		return 0;
 	} else if (!n) {
 		/* TODO: change error code? */
@@ -340,12 +332,10 @@ libc_hidden_def(mbrtowc)
 /**********************************************************************/
 #ifdef L_wcrtomb
 
-libc_hidden_proto(wcsnrtombs)
 
 /* Note: We completely ignore ps in all currently supported conversions. */
 /* TODO: Check for valid state anyway? */
 
-libc_hidden_proto(wcrtomb)
 size_t wcrtomb(register char *__restrict s, wchar_t wc,
 			   mbstate_t *__restrict ps)
 {
@@ -374,9 +364,7 @@ libc_hidden_def(wcrtomb)
 /**********************************************************************/
 #ifdef L_mbsrtowcs
 
-libc_hidden_proto(mbsnrtowcs)
 
-libc_hidden_proto(mbsrtowcs)
 size_t mbsrtowcs(wchar_t *__restrict dst, const char **__restrict src,
 				 size_t len, mbstate_t *__restrict ps)
 {
@@ -395,9 +383,7 @@ libc_hidden_def(mbsrtowcs)
 
  * TODO: Check for valid state anyway? */
 
-libc_hidden_proto(wcsnrtombs)
 
-libc_hidden_proto(wcsrtombs)
 size_t wcsrtombs(char *__restrict dst, const wchar_t **__restrict src,
 				 size_t len, mbstate_t *__restrict ps)
 {
@@ -616,7 +602,7 @@ size_t attribute_hidden _wchar_wcsntoutf8s(char *__restrict s, size_t n,
 		if (!s) {
 			n = SIZE_MAX;
 		}
-	    s = buf;
+		s = buf;
 		store = 0;
 	}
 
@@ -702,7 +688,6 @@ size_t attribute_hidden _wchar_wcsntoutf8s(char *__restrict s, size_t n,
 
 /* WARNING: We treat len as SIZE_MAX when dst is NULL! */
 
-libc_hidden_proto(mbsnrtowcs)
 size_t mbsnrtowcs(wchar_t *__restrict dst, const char **__restrict src,
 					size_t NMC, size_t len, mbstate_t *__restrict ps)
 {
@@ -754,8 +739,8 @@ size_t mbsnrtowcs(wchar_t *__restrict dst, const char **__restrict src,
 		while (count) {
 			if ((wc = ((unsigned char)(*s))) >= 0x80) {	/* Non-ASCII... */
 				wc -= 0x80;
-				wc = __UCLIBC_CURLOCALE_DATA.tbl8c2wc[
-						  (__UCLIBC_CURLOCALE_DATA.idx8c2wc[wc >> Cc2wc_IDX_SHIFT]
+				wc = __UCLIBC_CURLOCALE->tbl8c2wc[
+						  (__UCLIBC_CURLOCALE->idx8c2wc[wc >> Cc2wc_IDX_SHIFT]
 						   << Cc2wc_IDX_SHIFT) + (wc & (Cc2wc_ROW_LEN - 1))];
 				if (!wc) {
 					goto BAD;
@@ -812,7 +797,6 @@ libc_hidden_def(mbsnrtowcs)
 /* Note: We completely ignore ps in all currently supported conversions.
  * TODO: Check for valid state anyway? */
 
-libc_hidden_proto(wcsnrtombs)
 size_t wcsnrtombs(char *__restrict dst, const wchar_t **__restrict src,
 					size_t NWC, size_t len, mbstate_t *__restrict ps)
 {
@@ -865,12 +849,12 @@ size_t wcsnrtombs(char *__restrict dst, const wchar_t **__restrict src,
 			} else {
 				u = 0;
 				if (wc <= Cwc2c_DOMAIN_MAX) {
-					u = __UCLIBC_CURLOCALE_DATA.idx8wc2c[wc >> (Cwc2c_TI_SHIFT
+					u = __UCLIBC_CURLOCALE->idx8wc2c[wc >> (Cwc2c_TI_SHIFT
 														+ Cwc2c_TT_SHIFT)];
-					u = __UCLIBC_CURLOCALE_DATA.tbl8wc2c[(u << Cwc2c_TI_SHIFT)
+					u = __UCLIBC_CURLOCALE->tbl8wc2c[(u << Cwc2c_TI_SHIFT)
 									+ ((wc >> Cwc2c_TT_SHIFT)
 									   & ((1 << Cwc2c_TI_SHIFT)-1))];
-					u = __UCLIBC_CURLOCALE_DATA.tbl8wc2c[Cwc2c_TI_LEN
+					u = __UCLIBC_CURLOCALE->tbl8wc2c[Cwc2c_TI_LEN
 									+ (u << Cwc2c_TT_SHIFT)
 									+ (wc & ((1 << Cwc2c_TT_SHIFT)-1))];
 				}
@@ -926,7 +910,6 @@ libc_hidden_def(wcsnrtombs)
 /**********************************************************************/
 #ifdef L_wcswidth
 
-libc_hidden_proto(wcswidth)
 
 #ifdef __UCLIBC_MJN3_ONLY__
 #warning REMINDER: If we start doing translit, wcwidth and wcswidth will need updating.
@@ -1042,13 +1025,12 @@ static const signed char new_wtbl[] = {
 	0,    2,    1,    2,    1,    0,    1,
 };
 
-libc_hidden_proto(wcsnrtombs)
 
 int wcswidth(const wchar_t *pwcs, size_t n)
 {
-    int h, l, m, count;
-    wchar_t wc;
-    unsigned char b;
+	int h, l, m, count;
+	wchar_t wc;
+	unsigned char b;
 
 	if (ENCODING == __ctype_encoding_7_bit) {
 		size_t i;
@@ -1084,7 +1066,7 @@ int wcswidth(const wchar_t *pwcs, size_t n)
 	}
 #endif /* __CTYPE_HAS_UTF_8_LOCALES */
 
-    for (count = 0 ; n && (wc = *pwcs++) ; n--) {
+	for (count = 0 ; n && (wc = *pwcs++) ; n--) {
 		if (wc <= 0xff) {
 			/* If we're here, wc != 0. */
 			if ((wc < 32) || ((wc >= 0x7f) && (wc < 0xa0))) {
@@ -1134,9 +1116,9 @@ int wcswidth(const wchar_t *pwcs, size_t n)
 		}
 
 		++count;
-    }
+	}
 
-    return count;
+	return count;
 }
 
 #else  /*  __UCLIBC_HAS_LOCALE__ */
@@ -1153,7 +1135,7 @@ int wcswidth(const wchar_t *pwcs, size_t n)
 		}
 	}
 
-    for (count = 0 ; n && (wc = *pwcs++) ; n--) {
+	for (count = 0 ; n && (wc = *pwcs++) ; n--) {
 		if (wc <= 0xff) {
 			/* If we're here, wc != 0. */
 			if ((wc < 32) || ((wc >= 0x7f) && (wc < 0xa0))) {
@@ -1177,11 +1159,10 @@ libc_hidden_def(wcswidth)
 /**********************************************************************/
 #ifdef L_wcwidth
 
-libc_hidden_proto(wcswidth)
 
 int wcwidth(wchar_t wc)
 {
-    return wcswidth(&wc, 1);
+	return wcswidth(&wc, 1);
 }
 
 #endif
@@ -1201,6 +1182,56 @@ typedef struct {
 	int skip_invalid_input;		/* To support iconv -c option. */
 } _UC_iconv_t;
 
+/* For the multibyte
+ * bit 0 means swap endian
+ * bit 1 means 2 byte
+ * bit 2 means 4 byte
+ *
+ */
+
+#if defined L_iconv && defined _LIBC
+/* Used externally only by iconv utility */
+extern const unsigned char __iconv_codesets[];
+libc_hidden_proto(__iconv_codesets)
+#endif
+
+#if defined L_iconv || defined L_iconv_main
+const unsigned char __iconv_codesets[] =
+	"\x0a\xe0""WCHAR_T\x00"		/* superset of UCS-4 but platform-endian */
+#if __BYTE_ORDER == __BIG_ENDIAN
+	"\x08\xec""UCS-4\x00"		/* always BE */
+	"\x0a\xec""UCS-4BE\x00"
+	"\x0a\xed""UCS-4LE\x00"
+	"\x09\xe4""UTF-32\x00"		/* platform endian with BOM */
+	"\x0b\xe4""UTF-32BE\x00"
+	"\x0b\xe5""UTF-32LE\x00"
+	"\x08\xe2""UCS-2\x00"		/* always BE */
+	"\x0a\xe2""UCS-2BE\x00"
+	"\x0a\xe3""UCS-2LE\x00"
+	"\x09\xea""UTF-16\x00"		/* platform endian with BOM */
+	"\x0b\xea""UTF-16BE\x00"
+	"\x0b\xeb""UTF-16LE\x00"
+#elif __BYTE_ORDER == __LITTLE_ENDIAN
+	"\x08\xed""UCS-4\x00"		/* always BE */
+	"\x0a\xed""UCS-4BE\x00"
+	"\x0a\xec""UCS-4LE\x00"
+	"\x09\xf4""UTF-32\x00"		/* platform endian with BOM */
+	"\x0b\xe5""UTF-32BE\x00"
+	"\x0b\xe4""UTF-32LE\x00"
+	"\x08\xe3""UCS-2\x00"		/* always BE */
+	"\x0a\xe3""UCS-2BE\x00"
+	"\x0a\xe2""UCS-2LE\x00"
+	"\x09\xfa""UTF-16\x00"		/* platform endian with BOM */
+	"\x0b\xeb""UTF-16BE\x00"
+	"\x0b\xea""UTF-16LE\x00"
+#endif
+	"\x08\x02""UTF-8\x00"
+	"\x0b\x01""US-ASCII\x00"
+	"\x07\x01""ASCII";			/* Must be last! (special case to save a nul) */
+#endif
+#if defined L_iconv && defined _LIBC
+libc_hidden_data_def(__iconv_codesets)
+#endif
 
 
 #ifdef L_iconv
@@ -1240,58 +1271,14 @@ enum {
 	IC_ASCII = 1
 };
 
-/* For the multibyte
- * bit 0 means swap endian
- * bit 1 means 2 byte
- * bit 2 means 4 byte
- *
- */
-
-extern const unsigned char __iconv_codesets[];
-libc_hidden_proto(__iconv_codesets)
-const unsigned char __iconv_codesets[] =
-	"\x0a\xe0""WCHAR_T\x00"		/* superset of UCS-4 but platform-endian */
-#if __BYTE_ORDER == __BIG_ENDIAN
-	"\x08\xec""UCS-4\x00"		/* always BE */
-	"\x0a\xec""UCS-4BE\x00"
-	"\x0a\xed""UCS-4LE\x00"
-	"\x09\xe4""UTF-32\x00"		/* platform endian with BOM */
-	"\x0b\xe4""UTF-32BE\x00"
-	"\x0b\xe5""UTF-32LE\x00"
-	"\x08\xe2""UCS-2\x00"		/* always BE */
-	"\x0a\xe2""UCS-2BE\x00"
-	"\x0a\xe3""UCS-2LE\x00"
-	"\x09\xea""UTF-16\x00"		/* platform endian with BOM */
-	"\x0b\xea""UTF-16BE\x00"
-	"\x0b\xeb""UTF-16LE\x00"
-#elif __BYTE_ORDER == __LITTLE_ENDIAN
-	"\x08\xed""UCS-4\x00"		/* always BE */
-	"\x0a\xed""UCS-4BE\x00"
-	"\x0a\xec""UCS-4LE\x00"
-	"\x09\xf4""UTF-32\x00"		/* platform endian with BOM */
-	"\x0b\xe5""UTF-32BE\x00"
-	"\x0b\xe4""UTF-32LE\x00"
-	"\x08\xe3""UCS-2\x00"		/* always BE */
-	"\x0a\xe3""UCS-2BE\x00"
-	"\x0a\xe2""UCS-2LE\x00"
-	"\x09\xfa""UTF-16\x00"		/* platform endian with BOM */
-	"\x0b\xeb""UTF-16BE\x00"
-	"\x0b\xea""UTF-16LE\x00"
-#endif
-	"\x08\x02""UTF-8\x00"
-	"\x0b\x01""US-ASCII\x00"
-	"\x07\x01""ASCII";			/* Must be last! (special case to save a nul) */
-libc_hidden_data_def(__iconv_codesets)
-
-/* Experimentally off - libc_hidden_proto(strcasecmp) */
 
 static int find_codeset(const char *name)
 {
 	const unsigned char *s;
 	int codeset;
 
-	for (s = __iconv_codesets ; *s ; s += *s) {
-		if (!strcasecmp(s+2, name)) {
+	for (s = __iconv_codesets; *s; s += *s) {
+		if (!strcasecmp((char*) (s + 2), name)) {
 			return s[1];
 		}
 	}
@@ -1301,7 +1288,7 @@ static int find_codeset(const char *name)
 	/* TODO: maybe CODESET_LIST + *s ??? */
 	/* 7bit is 1, UTF-8 is 2, 8-bit is >= 3 */
 	codeset = 2;
-	s = __LOCALE_DATA_CODESET_LIST;
+	s = (const unsigned char *) __LOCALE_DATA_CODESET_LIST;
 	do {
 		++codeset;		/* Increment codeset first. */
 		if (!strcasecmp(__LOCALE_DATA_CODESET_LIST+*s, name)) {
@@ -1468,7 +1455,7 @@ size_t weak_function iconv(iconv_t cd, char **__restrict inbuf,
 				const __codeset_8_bit_t *c8b
 					= __locale_mmap->codeset_8_bit + px->fromcodeset - 3;
 				wc -= 0x80;
-				wc = __UCLIBC_CURLOCALE_DATA.tbl8c2wc[
+				wc = __UCLIBC_CURLOCALE->tbl8c2wc[
 							 (c8b->idx8c2wc[wc >> Cc2wc_IDX_SHIFT]
 							  << Cc2wc_IDX_SHIFT) + (wc & (Cc2wc_ROW_LEN - 1))];
 				if (!wc) {
@@ -1553,10 +1540,10 @@ size_t weak_function iconv(iconv_t cd, char **__restrict inbuf,
 					= __locale_mmap->codeset_8_bit + px->tocodeset - 3;
 				__uwchar_t u;
 				u = c8b->idx8wc2c[wc >> (Cwc2c_TI_SHIFT + Cwc2c_TT_SHIFT)];
-				u = __UCLIBC_CURLOCALE_DATA.tbl8wc2c[(u << Cwc2c_TI_SHIFT)
+				u = __UCLIBC_CURLOCALE->tbl8wc2c[(u << Cwc2c_TI_SHIFT)
 						 + ((wc >> Cwc2c_TT_SHIFT)
 							& ((1 << Cwc2c_TI_SHIFT)-1))];
-				wc = __UCLIBC_CURLOCALE_DATA.tbl8wc2c[Cwc2c_TI_LEN
+				wc = __UCLIBC_CURLOCALE->tbl8wc2c[Cwc2c_TI_LEN
 						 + (u << Cwc2c_TT_SHIFT)
 						 + (wc & ((1 << Cwc2c_TT_SHIFT)-1))];
 				if (wc) {
@@ -1575,6 +1562,4 @@ size_t weak_function iconv(iconv_t cd, char **__restrict inbuf,
 	}
 	return nrcount;
 }
-
 #endif
-

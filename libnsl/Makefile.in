@@ -5,8 +5,11 @@
 # Licensed under the LGPL v2.1, see the file COPYING.LIB in this tarball.
 #
 
+subdirs += libnsl
+
 CFLAGS-libnsl := -DNOT_IN_libc -DIS_IN_libnsl $(SSP_ALL_CFLAGS)
 
+LDFLAGS-$(UCLIBC_FORMAT_DSBT_ELF)-libnsl.so := -Wl,--dsbt-index=6
 LDFLAGS-libnsl.so := $(LDFLAGS) $(call link.asneeded,-lc)
 
 LIBS-libnsl.so := $(LIBS)
@@ -26,16 +29,16 @@ libnsl-a-y := $(libnsl_OBJ)
 endif
 libnsl-so-y := $(libnsl_OBJ:.o=.os)
 
-lib-a-y += $(top_builddir)lib/libnsl.a
-lib-so-y += $(top_builddir)lib/libnsl.so
-objclean-y += libnsl_clean
+lib-a-$(UCLIBC_HAS_LIBNSL_STUB) += $(top_builddir)lib/libnsl.a
+lib-so-$(UCLIBC_HAS_LIBNSL_STUB) += $(top_builddir)lib/libnsl.so
+objclean-y += CLEAN_libnsl
 
 ifeq ($(DOPIC),y)
 $(top_builddir)lib/libnsl.so: $(top_builddir)lib/libnsl.a $(libc.depend)
 else
 $(top_builddir)lib/libnsl.so: $(libnsl_OUT)/libnsl_so.a $(libc.depend)
 endif
-	$(call link.so,$(libnsl_FULL_NAME),$(MAJOR_VERSION))
+	$(call link.so,$(libnsl_FULL_NAME),$(ABI_VERSION))
 
 $(libnsl_OUT)/libnsl_so.a: $(libnsl-so-y)
 	$(Q)$(RM) $@
@@ -46,5 +49,5 @@ $(top_builddir)lib/libnsl.a: $(libnsl-a-y)
 	$(Q)$(RM) $@
 	$(do_ar)
 
-libnsl_clean:
+CLEAN_libnsl:
 	$(do_rm) $(addprefix $(libnsl_OUT)/*., o os a)

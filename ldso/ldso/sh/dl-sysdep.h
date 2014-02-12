@@ -88,8 +88,10 @@ _dl_urem(unsigned int n, unsigned int base)
    define the value.
    ELF_RTYPE_CLASS_NOCOPY iff TYPE should not be allowed to resolve to one
    of the main executable's symbols, as for a COPY reloc.  */
-#define elf_machine_type_class(type) \
-  ((((type) == R_SH_JMP_SLOT) * ELF_RTYPE_CLASS_PLT)	\
+# define elf_machine_type_class(type) \
+  ((((type) == R_SH_JMP_SLOT || (type) == R_SH_TLS_DTPMOD32		      \
+     || (type) == R_SH_TLS_DTPOFF32 || (type) == R_SH_TLS_TPOFF32)	      \
+    * ELF_RTYPE_CLASS_PLT)						      \
    | (((type) == R_SH_COPY) * ELF_RTYPE_CLASS_COPY))
 
 /* Return the link-time address of _DYNAMIC.  Conveniently, this is the

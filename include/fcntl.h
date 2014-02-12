@@ -1,5 +1,5 @@
-/* Copyright (C) 1991,1992,1994-2001,2003,2004,2005
-   Free Software Foundation, Inc.
+/* Copyright (C) 1991,1992,1994-2001,2003,2004,2005,2006,2007, 2009
+	Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -73,8 +73,9 @@ __BEGIN_DECLS
 
    This function is a cancellation point and therefore not marked with
    __THROW.  */
-#ifndef __USE_FILE_OFFSET64
+#if !defined(__USE_FILE_OFFSET64) || defined(__LP64__)
 extern int fcntl (int __fd, int __cmd, ...);
+libc_hidden_proto(fcntl)
 #else
 # ifdef __REDIRECT
 extern int __REDIRECT (fcntl, (int __fd, int __cmd, ...), fcntl64);
@@ -82,8 +83,9 @@ extern int __REDIRECT (fcntl, (int __fd, int __cmd, ...), fcntl64);
 #  define fcntl fcntl64
 # endif
 #endif
-#ifdef __USE_LARGEFILE64
+#if defined(__USE_LARGEFILE64) && !defined(__LP64__)
 extern int fcntl64 (int __fd, int __cmd, ...);
+libc_hidden_proto(fcntl64)
 #endif
 
 /* Open FILE and return a new file descriptor for it, or -1 on error.
@@ -94,6 +96,7 @@ extern int fcntl64 (int __fd, int __cmd, ...);
    __THROW.  */
 #ifndef __USE_FILE_OFFSET64
 extern int open (__const char *__file, int __oflag, ...) __nonnull ((1));
+libc_hidden_proto(open)
 #else
 # ifdef __REDIRECT
 extern int __REDIRECT (open, (__const char *__file, int __oflag, ...), open64)
@@ -104,6 +107,7 @@ extern int __REDIRECT (open, (__const char *__file, int __oflag, ...), open64)
 #endif
 #ifdef __USE_LARGEFILE64
 extern int open64 (__const char *__file, int __oflag, ...) __nonnull ((1));
+libc_hidden_proto(open64)
 #endif
 
 #ifdef __USE_ATFILE
@@ -170,15 +174,17 @@ extern int creat64 (__const char *__file, __mode_t __mode) __nonnull ((1));
 
 # ifndef __USE_FILE_OFFSET64
 extern int lockf (int __fd, int __cmd, __off_t __len);
+libc_hidden_proto(lockf)
 # else
-# ifdef __REDIRECT
+#  ifdef __REDIRECT
 extern int __REDIRECT (lockf, (int __fd, int __cmd, __off64_t __len), lockf64);
-# else
-#  define lockf lockf64
-# endif
+#  else
+#   define lockf lockf64
+#  endif
 # endif
 # ifdef __USE_LARGEFILE64
 extern int lockf64 (int __fd, int __cmd, __off64_t __len);
+libc_hidden_proto(lockf64)
 # endif
 #endif
 
@@ -189,13 +195,13 @@ extern int lockf64 (int __fd, int __cmd, __off64_t __len);
 extern int posix_fadvise (int __fd, __off_t __offset, __off_t __len,
 			  int __advise) __THROW;
 # else
-# ifdef __REDIRECT_NTH
+#  ifdef __REDIRECT_NTH
 extern int __REDIRECT_NTH (posix_fadvise, (int __fd, __off64_t __offset,
-				       __off64_t __len, int __advise),
-		       posix_fadvise64);
-# else
-#  define posix_fadvise posix_fadvise64
-# endif
+					   __off64_t __len, int __advise),
+			   posix_fadvise64);
+#  else
+#   define posix_fadvise posix_fadvise64
+#  endif
 # endif
 # ifdef __USE_LARGEFILE64
 extern int posix_fadvise64 (int __fd, __off64_t __offset, __off64_t __len,
@@ -215,17 +221,22 @@ extern int posix_fadvise64 (int __fd, __off64_t __offset, __off64_t __len,
 # ifndef __USE_FILE_OFFSET64
 extern int posix_fallocate (int __fd, __off_t __offset, __off_t __len);
 # else
-# ifdef __REDIRECT
+#  ifdef __REDIRECT
 extern int __REDIRECT (posix_fallocate, (int __fd, __off64_t __offset,
 					 __off64_t __len),
 		       posix_fallocate64);
-# else
-#  define posix_fallocate posix_fallocate64
-# endif
+#  else
+#   define posix_fallocate posix_fallocate64
+#  endif
 # endif
 # ifdef __USE_LARGEFILE64
 extern int posix_fallocate64 (int __fd, __off64_t __offset, __off64_t __len);
 # endif
+#endif
+
+#ifdef _LIBC
+extern int __fcntl_nocancel (int fd, int cmd, ...);
+libc_hidden_proto(__fcntl_nocancel)
 #endif
 
 __END_DECLS

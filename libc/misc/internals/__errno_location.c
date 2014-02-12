@@ -6,9 +6,12 @@
 
 #include "internal_errno.h"
 
-/* psm: moved to bits/errno.h: libc_hidden_proto(__errno_location) */
-libc_hidden_proto(__errno_location)
-int * weak_const_function __errno_location (void)
+/* psm: moved to bits/errno.h: */
+int *
+#ifndef __UCLIBC_HAS_THREADS__
+weak_const_function
+#endif
+__errno_location (void)
 {
     return &errno;
 }

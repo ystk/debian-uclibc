@@ -5,6 +5,8 @@
 # Licensed under the LGPL v2.1, see the file COPYING.LIB in this tarball.
 #
 
+subdirs += libc/misc/assert
+
 CSRC := __assert.c
 
 MISC_ASSERT_DIR := $(top_srcdir)libc/misc/assert
@@ -15,7 +17,7 @@ MISC_ASSERT_OBJ := $(MISC_ASSERT_OUT)/__assert.o
 
 libc-y += $(MISC_ASSERT_OBJ)
 
-objclean-y += misc_assert_clean
+objclean-y += CLEAN_libc/misc/assert
 
-misc_assert_clean:
+CLEAN_libc/misc/assert:
 	$(do_rm) $(addprefix $(MISC_ASSERT_OUT)/*., o os)

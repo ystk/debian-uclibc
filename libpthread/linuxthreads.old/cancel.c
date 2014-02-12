@@ -31,7 +31,7 @@ extern void __rpc_thread_destroy(void);
 
 #ifdef _STACK_GROWS_DOWN
 # define FRAME_LEFT(frame, other) ((char *) frame >= (char *) other)
-#elif _STACK_GROWS_UP
+#elif defined _STACK_GROWS_UP
 # define FRAME_LEFT(frame, other) ((char *) frame <= (char *) other)
 #else
 # error "Define either _STACK_GROWS_DOWN or _STACK_GROWS_UP"
@@ -193,10 +193,10 @@ void __pthread_perform_cleanup(char *currentframe)
 
   for (c = THREAD_GETMEM(self, p_cleanup); c != NULL; c = c->__prev)
     {
-#if _STACK_GROWS_DOWN
+#ifdef _STACK_GROWS_DOWN
       if ((char *) c <= currentframe)
 	break;
-#elif _STACK_GROWS_UP
+#elif defined _STACK_GROWS_UP
       if ((char *) c >= currentframe)
 	break;
 #else
@@ -213,9 +213,9 @@ void __pthread_perform_cleanup(char *currentframe)
 }
 
 #ifndef __PIC__
-/* We need a hook to force the cancelation wrappers to be linked in when
+/* We need a hook to force the cancellation wrappers to be linked in when
    static libpthread is used.  */
-extern const int __pthread_provide_wrappers;
-static const int * const __pthread_require_wrappers =
+extern const char __pthread_provide_wrappers;
+static const char *const __pthread_require_wrappers =
   &__pthread_provide_wrappers;
 #endif

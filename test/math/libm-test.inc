@@ -26,17 +26,17 @@
    FUNC(function): converts general function name (like cos) to
    name with correct suffix (e.g. cosl or cosf)
    MATHCONST(x):   like FUNC but for constants (e.g convert 0.0 to 0.0L)
-   FLOAT:	   floating point type to test
-   - TEST_MSG:	   informal message to be displayed
+   FLOAT:          floating point type to test
+   - TEST_MSG:     informal message to be displayed
    CHOOSE(Clongdouble,Cdouble,Cfloat,Cinlinelongdouble,Cinlinedouble,Cinlinefloat):
    chooses one of the parameters as delta for testing
    equality
-   PRINTF_EXPR	   Floating point conversion specification to print a variable
+   PRINTF_EXPR     Floating point conversion specification to print a variable
    of type FLOAT with printf.  PRINTF_EXPR just contains
    the specifier, not the percent and width arguments,
    e.g. "f".
    PRINTF_XEXPR	   Like PRINTF_EXPR, but print in hexadecimal format.
-   PRINTF_NEXPR Like PRINTF_EXPR, but print nice.  */
+   PRINTF_NEXPR    Like PRINTF_EXPR, but print nice.  */
 
 /* This testsuite has currently tests for:
    acos, acosh, asin, asinh, atan, atan2, atanh,
@@ -2883,7 +2883,6 @@ frexp_test (void)
 static void
 gamma_test (void)
 {
-#if !defined TEST_DOUBLE && !defined TEST_FLOAT && !defined TEST_LDOUBLE
   errno = 0;
   FUNC(gamma) (1);
 
@@ -2907,9 +2906,7 @@ gamma_test (void)
   TEST_f_f1 (gamma, -0.5, M_LOG_2_SQRT_PIl, -1);
 
   END (gamma);
-#endif
 }
-
 
 static void
 hypot_test (void)
@@ -3006,18 +3003,18 @@ isnormal_test (void)
   END (isnormal);
 }
 
+#if defined __DO_XSI_MATH__
 static void
 j0_test (void)
 {
-#if !defined TEST_DOUBLE && !defined TEST_FLOAT && !defined TEST_LDOUBLE
   errno = 0;
-# if 0
+#if 0
   FLOAT s, c;
   FUNC (sincos) (0, &s, &c);
   if (errno == ENOSYS)
     /* Required function not implemented.  */
     return;
-# endif
+#endif
   FUNC(j0) (0);
   if (errno == ENOSYS)
     /* Function not implemented.  */
@@ -3041,22 +3038,20 @@ j0_test (void)
   TEST_f_f (j0, -4.0, -3.9714980986384737228659076845169804197562E-1L);
 
   END (j0);
-#endif
 }
 
 
 static void
 j1_test (void)
 {
-#if !defined TEST_DOUBLE && !defined TEST_FLOAT && !defined TEST_LDOUBLE
   errno = 0;
-# if 0
+#if 0
   FLOAT s, c;
   FUNC (sincos) (0, &s, &c);
   if (errno == ENOSYS)
     /* Required function not implemented.  */
     return;
-# endif
+#endif
   FUNC(j1) (0);
   if (errno == ENOSYS)
     /* Function not implemented.  */
@@ -3080,21 +3075,19 @@ j1_test (void)
   TEST_f_f (j1, 10.0, 0.0434727461688614366697487680258592883L);
 
   END (j1);
-#endif
 }
 
 static void
 jn_test (void)
 {
-#if !defined TEST_DOUBLE && !defined TEST_FLOAT && !defined TEST_LDOUBLE
   errno = 0;
-# if 0
+#if 0
   FLOAT s, c;
   FUNC (sincos) (0, &s, &c);
   if (errno == ENOSYS)
     /* Required function not implemented.  */
     return;
-# endif
+#endif
   FUNC(jn) (1, 1);
   if (errno == ENOSYS)
     /* Function not implemented.  */
@@ -3156,8 +3149,8 @@ jn_test (void)
   TEST_ff_f (jn, 10, 10.0, 0.207486106633358857697278723518753428L);
 
   END (jn);
-#endif
 }
+#endif /* __DO_XSI_MATH__ */
 
 
 static void
@@ -4240,9 +4233,9 @@ round_test (void)
 static void
 scalb_test (void)
 {
-#ifdef __UCLIBC_SUSV3_LEGACY__
   START (scalb);
 #ifndef TEST_LDOUBLE /* uclibc doesn't have scalbl */
+#ifdef __UCLIBC_SUSV3_LEGACY__ /* scalbf is susv3 legacy */
 
   TEST_ff_f (scalb, 2.0, 0.5, nan_value, INVALID_EXCEPTION);
   TEST_ff_f (scalb, 3.0, -2.5, nan_value, INVALID_EXCEPTION);
@@ -4293,9 +4286,9 @@ scalb_test (void)
 
   TEST_ff_f (scalb, 0.8L, 4, 12.8L);
   TEST_ff_f (scalb, -0.854375L, 5, -27.34L);
-#endif
+#endif /* __UCLIBC_SUSV3_LEGACY__ */
+#endif /* TEST_LDOUBLE */
   END (scalb);
-#endif
 }
 
 
@@ -4321,6 +4314,7 @@ scalbn_test (void)
 }
 
 
+#if 0
 static void
 scalbln_test (void)
 {
@@ -4341,6 +4335,7 @@ scalbln_test (void)
 
   END (scalbn);
 }
+#endif
 
 
 static void
@@ -4524,7 +4519,8 @@ tanh_test (void)
   START (tanh);
 
   TEST_f_f (tanh, 0, 0);
-  TEST_f_f (tanh, minus_zero, minus_zero);
+  /* vda: uclibc: added IGNORE_ZERO_INF_SIGN to treat -0 as ok */
+  TEST_f_f (tanh, minus_zero, minus_zero, IGNORE_ZERO_INF_SIGN);
 
 #ifndef TEST_INLINE
   TEST_f_f (tanh, plus_infty, 1);
@@ -4544,6 +4540,7 @@ tanh_test (void)
   END (tanh);
 }
 
+#if 0
 static void
 tgamma_test (void)
 {
@@ -4575,6 +4572,7 @@ tgamma_test (void)
 
   END (tgamma);
 }
+#endif
 
 
 #if 0
@@ -4654,18 +4652,18 @@ trunc_test (void)
 }
 #endif
 
+#if defined __DO_XSI_MATH__
 static void
 y0_test (void)
 {
-#if !defined TEST_DOUBLE && !defined TEST_FLOAT && !defined TEST_LDOUBLE
   errno = 0;
-# if 0
+#if 0
   FLOAT s, c;
   FUNC (sincos) (0, &s, &c);
   if (errno == ENOSYS)
     /* Required function not implemented.  */
     return;
-# endif
+#endif
   FUNC(y0) (1);
   if (errno == ENOSYS)
     /* Function not implemented.  */
@@ -4688,22 +4686,20 @@ y0_test (void)
   TEST_f_f (y0, 10.0, 0.0556711672835993914244598774101900481L);
 
   END (y0);
-#endif
 }
 
 
 static void
 y1_test (void)
 {
-#if !defined TEST_DOUBLE && !defined TEST_FLOAT && !defined TEST_LDOUBLE
   errno = 0;
-# if 0
+#if 0
   FLOAT s, c;
   FUNC (sincos) (0, &s, &c);
   if (errno == ENOSYS)
     /* Required function not implemented.  */
     return;
-# endif
+#endif
   FUNC(y1) (1);
   if (errno == ENOSYS)
     /* Function not implemented.  */
@@ -4726,22 +4722,20 @@ y1_test (void)
   TEST_f_f (y1, 10.0, 0.249015424206953883923283474663222803L);
 
   END (y1);
-#endif
 }
 
 
 static void
 yn_test (void)
 {
-#if !defined TEST_DOUBLE && !defined TEST_FLOAT && !defined TEST_LDOUBLE
   errno = 0;
-# if 0
+#if 0
   FLOAT s, c;
   FUNC (sincos) (0, &s, &c);
   if (errno == ENOSYS)
     /* Required function not implemented.  */
     return;
-# endif
+#endif
   FUNC(yn) (1, 1);
   if (errno == ENOSYS)
     /* Function not implemented.  */
@@ -4799,14 +4793,14 @@ yn_test (void)
   TEST_ff_f (yn, 10, 10.0, -0.359814152183402722051986577343560609L);
 
   END (yn);
-#endif
-}
 
-/* FIXME: Remove support for significand or only for OBSCURE_754_TESTS. */
+}
+#endif /* __DO_XSI_MATH__ */
+
+
 static void
 significand_test (void)
 {
-#if !defined TEST_DOUBLE && !defined TEST_FLOAT && !defined TEST_LDOUBLE
   /* significand returns the mantissa of the exponential representation.  */
   START (significand);
 
@@ -4815,7 +4809,6 @@ significand_test (void)
   TEST_f_f (significand, 8.0, 1.0);
 
   END (significand);
-#endif
 }
 
 
@@ -5080,12 +5073,14 @@ main (int argc, char **argv)
 #endif
 
   /* Bessel functions:  */
+#if defined __DO_XSI_MATH__
   j0_test ();
   j1_test ();
   jn_test ();
   y0_test ();
   y1_test ();
   yn_test ();
+#endif /* __DO_XSI_MATH__ */
 
   if (output_ulps)
     fclose (ulps_file);

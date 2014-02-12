@@ -42,7 +42,7 @@ libpthread_hidden_proto(pthread_attr_setscope)
  * Therefore, define the function pthread_attr_init() here using
  * a strong symbol. */
 
-//int __pthread_attr_init_2_1(pthread_attr_t *attr)
+/*int __pthread_attr_init_2_1(pthread_attr_t *attr)*/
 int pthread_attr_init(pthread_attr_t *attr)
 {
   size_t ps = getpagesize ();
@@ -61,7 +61,7 @@ int pthread_attr_init(pthread_attr_t *attr)
 libpthread_hidden_def(pthread_attr_init)
 
 /* uClibc: leave out this for now. */
-#if DO_PTHREAD_VERSIONING_WITH_UCLIBC
+#if defined DO_PTHREAD_VERSIONING_WITH_UCLIBC
 #if defined __PIC__ && defined DO_VERSIONING
 default_symbol_version (__pthread_attr_init_2_1, pthread_attr_init, GLIBC_2.1);
 
@@ -201,6 +201,7 @@ int __pthread_attr_getguardsize(const pthread_attr_t *attr, size_t *guardsize)
 }
 weak_alias (__pthread_attr_getguardsize, pthread_attr_getguardsize)
 
+#if 0 /* uClibc: deprecated stuff disabled */
 int __pthread_attr_setstackaddr(pthread_attr_t *attr, void *stackaddr)
 {
   attr->__stackaddr = stackaddr;
@@ -218,6 +219,7 @@ int __pthread_attr_getstackaddr(const pthread_attr_t *attr, void **stackaddr)
   return 0;
 }
 weak_alias (__pthread_attr_getstackaddr, pthread_attr_getstackaddr)
+#endif
 
 int __pthread_attr_setstacksize(pthread_attr_t *attr, size_t stacksize)
 {

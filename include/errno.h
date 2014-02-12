@@ -58,9 +58,27 @@ extern const char *program_invocation_name, *program_invocation_short_name;
 
 __END_DECLS
 
-#if defined _LIBC && ( defined IS_IN_libc || defined NOT_IN_libc )
-#include <bits/uClibc_errno.h>
+#ifdef _LIBC
+#ifdef IS_IN_rtld
+# undef errno
+# define errno _dl_errno
+extern int _dl_errno; /* attribute_hidden */
+#elif defined __UCLIBC_HAS_TLS__
+# if !defined NOT_IN_libc || defined IS_IN_libpthread
+#  undef errno
+#  ifndef NOT_IN_libc
+#   define errno __libc_errno
+#  else
+#   define errno errno             /* For #ifndef errno tests.  */
+#  endif
+extern __thread int errno attribute_tls_model_ie;
+# endif
 #endif
+
+#ifndef __set_errno
+#define __set_errno(val) (errno = (val))
+#endif
+#endif /* _LIBC */
 
 #endif /* _ERRNO_H */
 

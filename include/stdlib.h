@@ -1,4 +1,4 @@
-/* Copyright (C) 1991-2003, 2004, 2005 Free Software Foundation, Inc.
+/* Copyright (C) 1991-2007, 2009 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -50,15 +50,15 @@ __BEGIN_DECLS
    as well as POSIX.1 use of `int' for the status word.  */
 
 #  if defined __GNUC__ && !defined __cplusplus
-#   define __WAIT_INT(status)						      \
-  (__extension__ ({ union { __typeof(status) __in; int __i; } __u;	      \
-		    __u.__in = (status); __u.__i; }))
+#   define __WAIT_INT(status) \
+  (__extension__ (((union { __typeof(status) __in; int __i; }) \
+		   { .__in = (status) }).__i))
 #  else
 #   define __WAIT_INT(status)	(*(int *) &(status))
 #  endif
 
 /* This is the type of the argument to `wait'.  The funky union
-   causes redeclarations with ether `int *' or `union wait *' to be
+   causes redeclarations with either `int *' or `union wait *' to be
    allowed without complaint.  __WAIT_STATUS_DEFN is the type used in
    the actual function definitions.  */
 
@@ -84,14 +84,14 @@ typedef union
 # endif /* Use BSD.  */
 
 /* Define the macros <sys/wait.h> also would define this way.  */
-# define WEXITSTATUS(status)	__WEXITSTATUS(__WAIT_INT(status))
-# define WTERMSIG(status)	__WTERMSIG(__WAIT_INT(status))
-# define WSTOPSIG(status)	__WSTOPSIG(__WAIT_INT(status))
-# define WIFEXITED(status)	__WIFEXITED(__WAIT_INT(status))
-# define WIFSIGNALED(status)	__WIFSIGNALED(__WAIT_INT(status))
-# define WIFSTOPPED(status)	__WIFSTOPPED(__WAIT_INT(status))
-# if 0 /* def __WIFCONTINUED */
-#  define WIFCONTINUED(status)	__WIFCONTINUED(__WAIT_INT(status))
+# define WEXITSTATUS(status)	__WEXITSTATUS (__WAIT_INT (status))
+# define WTERMSIG(status)	__WTERMSIG (__WAIT_INT (status))
+# define WSTOPSIG(status)	__WSTOPSIG (__WAIT_INT (status))
+# define WIFEXITED(status)	__WIFEXITED (__WAIT_INT (status))
+# define WIFSIGNALED(status)	__WIFSIGNALED (__WAIT_INT (status))
+# define WIFSTOPPED(status)	__WIFSTOPPED (__WAIT_INT (status))
+# ifdef __WIFCONTINUED
+#  define WIFCONTINUED(status)	__WIFCONTINUED (__WAIT_INT (status))
 # endif
 #endif	/* X/Open and <sys/wait.h> not included.  */
 
@@ -141,10 +141,14 @@ __END_NAMESPACE_C99
 #if 0
 #define	MB_CUR_MAX	(__ctype_get_mb_cur_max ())
 extern size_t __ctype_get_mb_cur_max (void) __THROW __wur;
-#endif
+#else
 #ifdef __UCLIBC_HAS_WCHAR__
-#define	MB_CUR_MAX	(_stdlib_mb_cur_max ())
+# define	MB_CUR_MAX	(_stdlib_mb_cur_max ())
 extern size_t _stdlib_mb_cur_max (void) __THROW __wur;
+libc_hidden_proto(_stdlib_mb_cur_max)
+#else
+# define	MB_CUR_MAX	1
+#endif
 #endif
 
 
@@ -157,6 +161,7 @@ extern double atof (__const char *__nptr)
 /* Convert a string to an integer.  */
 extern int atoi (__const char *__nptr)
      __THROW __attribute_pure__ __nonnull ((1)) __wur;
+libc_hidden_proto(atoi)
 /* Convert a string to a long integer.  */
 extern long int atol (__const char *__nptr)
      __THROW __attribute_pure__ __nonnull ((1)) __wur;
@@ -176,6 +181,7 @@ __BEGIN_NAMESPACE_STD
 extern double strtod (__const char *__restrict __nptr,
 		      char **__restrict __endptr)
      __THROW __nonnull ((1)) __wur;
+libc_hidden_proto(strtod)
 __END_NAMESPACE_STD
 
 #ifdef	__USE_ISOC99
@@ -196,10 +202,12 @@ __BEGIN_NAMESPACE_STD
 extern long int strtol (__const char *__restrict __nptr,
 			char **__restrict __endptr, int __base)
      __THROW __nonnull ((1)) __wur;
+libc_hidden_proto(strtol)
 /* Convert a string to an unsigned long integer.  */
 extern unsigned long int strtoul (__const char *__restrict __nptr,
 				  char **__restrict __endptr, int __base)
      __THROW __nonnull ((1)) __wur;
+libc_hidden_proto(strtoul)
 __END_NAMESPACE_STD
 
 #ifdef __USE_BSD
@@ -207,7 +215,7 @@ __END_NAMESPACE_STD
 
 /* Convert a string to a quadword integer.  */
 __extension__
-extern long long int strtoq (__const char *__restrict __nptr,
+extern quad_t strtoq (__const char *__restrict __nptr,
 			     char **__restrict __endptr, int __base)
      __THROW __nonnull ((1)) __wur;
 /* Convert a string to an unsigned quadword integer.  */
@@ -224,6 +232,7 @@ __extension__
 extern long long int strtoll (__const char *__restrict __nptr,
 			      char **__restrict __endptr, int __base)
      __THROW __nonnull ((1)) __wur;
+libc_hidden_proto(strtoll)
 /* Convert a string to an unsigned quadword integer.  */
 __extension__
 extern unsigned long long int strtoull (__const char *__restrict __nptr,
@@ -233,18 +242,17 @@ __END_NAMESPACE_C99
 #endif /* ISO C99 or GCC and use MISC.  */
 
 
-#ifdef __UCLIBC_HAS_XLOCALE__
-#ifdef __USE_GNU
+#if defined __USE_GNU && defined __UCLIBC_HAS_XLOCALE__
 /* The concept of one static locale per category is not very well
    thought out.  Many applications will need to process its data using
-   information from several different locales.  Another application is
+   information from several different locales.  Another problem is
    the implementation of the internationalization handling in the
-   upcoming ISO C++ standard library.  To support this another set of
-   the functions using locale data exist which have an additional
+   ISO C++ standard library.  To support this another set of
+   the functions using locale data exist which take an additional
    argument.
 
-   Attention: all these functions are *not* standardized in any form.
-   This is a proof-of-concept implementation.  */
+   Attention: even though several *_l interfaces are part of POSIX:2008,
+   these are not.  */
 
 /* Structure for reentrant locale using functions.  This is an
    (almost) opaque type for the user level programs.  */
@@ -255,11 +263,13 @@ __END_NAMESPACE_C99
 extern long int strtol_l (__const char *__restrict __nptr,
 			  char **__restrict __endptr, int __base,
 			  __locale_t __loc) __THROW __nonnull ((1, 4)) __wur;
+libc_hidden_proto(strtol_l)
 
 extern unsigned long int strtoul_l (__const char *__restrict __nptr,
 				    char **__restrict __endptr,
 				    int __base, __locale_t __loc)
      __THROW __nonnull ((1, 4)) __wur;
+libc_hidden_proto(strtoul_l)
 
 __extension__
 extern long long int strtoll_l (__const char *__restrict __nptr,
@@ -287,9 +297,7 @@ extern long double strtold_l (__const char *__restrict __nptr,
 			      __locale_t __loc)
      __THROW __nonnull ((1, 3)) __wur;
 #endif /* __UCLIBC_HAS_FLOATS__ */
-
 #endif /* GNU */
-#endif /* __UCLIBC_HAS_XLOCALE__ */
 
 
 #if defined __USE_SVID || defined __USE_XOPEN_EXTENDED
@@ -313,6 +321,7 @@ extern long int a64l (__const char *__s)
    We provide both interfaces to the same random number generator.  */
 /* Return a random long integer between 0 and RAND_MAX inclusive.  */
 extern long int random (void) __THROW;
+libc_hidden_proto(random)
 
 /* Seed the random number generator with the given number.  */
 extern void srandom (unsigned int __seed) __THROW;
@@ -339,26 +348,37 @@ struct random_data
     int32_t *fptr;		/* Front pointer.  */
     int32_t *rptr;		/* Rear pointer.  */
     int32_t *state;		/* Array of state values.  */
+#if 0
     int rand_type;		/* Type of random number generator.  */
     int rand_deg;		/* Degree of random number generator.  */
     int rand_sep;		/* Distance between front and rear.  */
+#else
+    /* random_r.c, TYPE_x, DEG_x, SEP_x - small enough for int8_t */
+    int8_t rand_type;		/* Type of random number generator.  */
+    int8_t rand_deg;		/* Degree of random number generator.  */
+    int8_t rand_sep;		/* Distance between front and rear.  */
+#endif
     int32_t *end_ptr;		/* Pointer behind state table.  */
   };
 
 extern int random_r (struct random_data *__restrict __buf,
 		     int32_t *__restrict __result) __THROW __nonnull ((1, 2));
+libc_hidden_proto(random_r)
 
 extern int srandom_r (unsigned int __seed, struct random_data *__buf)
      __THROW __nonnull ((2));
+libc_hidden_proto(srandom_r)
 
 extern int initstate_r (unsigned int __seed, char *__restrict __statebuf,
 			size_t __statelen,
 			struct random_data *__restrict __buf)
      __THROW __nonnull ((2, 4));
+libc_hidden_proto(initstate_r)
 
 extern int setstate_r (char *__restrict __statebuf,
 		       struct random_data *__restrict __buf)
      __THROW __nonnull ((1, 2));
+libc_hidden_proto(setstate_r)
 # endif	/* Use misc.  */
 #endif	/* Use SVID || extended X/Open || BSD. */
 
@@ -421,16 +441,19 @@ extern int drand48_r (struct drand48_data *__restrict __buffer,
 extern int erand48_r (unsigned short int __xsubi[3],
 		      struct drand48_data *__restrict __buffer,
 		      double *__restrict __result) __THROW __nonnull ((1, 2));
+libc_hidden_proto(erand48_r)
 #endif /* __UCLIBC_HAS_FLOATS__ */
 
 /* Return non-negative, long integer in [0,2^31).  */
 extern int lrand48_r (struct drand48_data *__restrict __buffer,
 		      long int *__restrict __result)
      __THROW __nonnull ((1, 2));
+libc_hidden_proto(lrand48_r)
 extern int nrand48_r (unsigned short int __xsubi[3],
 		      struct drand48_data *__restrict __buffer,
 		      long int *__restrict __result)
      __THROW __nonnull ((1, 2));
+libc_hidden_proto(nrand48_r)
 
 /* Return signed, long integers in [-2^31,2^31).  */
 extern int mrand48_r (struct drand48_data *__restrict __buffer,
@@ -440,13 +463,16 @@ extern int jrand48_r (unsigned short int __xsubi[3],
 		      struct drand48_data *__restrict __buffer,
 		      long int *__restrict __result)
      __THROW __nonnull ((1, 2));
+libc_hidden_proto(jrand48_r)
 
 /* Seed random number generator.  */
 extern int srand48_r (long int __seedval, struct drand48_data *__buffer)
      __THROW __nonnull ((2));
+libc_hidden_proto(srand48_r)
 
 extern int seed48_r (unsigned short int __seed16v[3],
 		     struct drand48_data *__buffer) __THROW __nonnull ((1, 2));
+libc_hidden_proto(seed48_r)
 
 extern int lcong48_r (unsigned short int __param[7],
 		      struct drand48_data *__buffer)
@@ -461,6 +487,8 @@ extern int lcong48_r (unsigned short int __param[7],
 __BEGIN_NAMESPACE_STD
 /* Allocate SIZE bytes of memory.  */
 extern void *malloc (size_t __size) __THROW __attribute_malloc__ __wur;
+/* We want the malloc symbols overridable at runtime
+ * libc_hidden_proto(malloc) */
 /* Allocate NMEMB elements of SIZE bytes each, all initialized to 0.  */
 extern void *calloc (size_t __nmemb, size_t __size)
      __THROW __attribute_malloc__ __wur;
@@ -471,13 +499,16 @@ __END_NAMESPACE_STD
 __BEGIN_NAMESPACE_STD
 /* Re-allocate the previously allocated block
    in PTR, making the new block SIZE bytes long.  */
+/* __attribute_malloc__ is not used, because if realloc returns
+   the same pointer that was passed to it, aliasing needs to be allowed
+   between objects pointed by the old and new pointers.  */
 extern void *realloc (void *__ptr, size_t __size)
-     __THROW __attribute_malloc__ __attribute_warn_unused_result__;
+     __THROW __attribute_warn_unused_result__;
 /* Free a block allocated by `malloc', `realloc' or `calloc'.  */
 extern void free (void *__ptr) __THROW;
 __END_NAMESPACE_STD
 
-#ifdef	__USE_MISC
+#if 0 /*def	__USE_MISC*/
 /* Free a block.  An alias for `free'.	(Sun Unices).  */
 extern void cfree (void *__ptr) __THROW;
 #endif /* Use misc.  */
@@ -500,6 +531,7 @@ extern int posix_memalign (void **__memptr, size_t __alignment, size_t __size)
 __BEGIN_NAMESPACE_STD
 /* Abort execution and generate a core-dump.  */
 extern void abort (void) __THROW __attribute__ ((__noreturn__));
+libc_hidden_proto(abort)
 
 
 /* Register a function to be called when `exit' is called.  */
@@ -515,9 +547,10 @@ extern int on_exit (void (*__func) (int __status, void *__arg), void *__arg)
 
 __BEGIN_NAMESPACE_STD
 /* Call all functions registered with `atexit' and `on_exit',
-   in the reverse of the order in which they were registered
+   in the reverse of the order in which they were registered,
    perform stdio cleanup, and terminate program execution with STATUS.  */
 extern void exit (int __status) __THROW __attribute__ ((__noreturn__));
+libc_hidden_proto(exit)
 __END_NAMESPACE_STD
 
 #ifdef __USE_ISOC99
@@ -532,12 +565,15 @@ __END_NAMESPACE_C99
 __BEGIN_NAMESPACE_STD
 /* Return the value of envariable NAME, or NULL if it doesn't exist.  */
 extern char *getenv (__const char *__name) __THROW __nonnull ((1)) __wur;
+libc_hidden_proto(getenv)
 __END_NAMESPACE_STD
 
+#if 0
 /* This function is similar to the above but returns NULL if the
    programs is running with SUID or SGID enabled.  */
 extern char *__secure_getenv (__const char *__name)
      __THROW __nonnull ((1)) __wur;
+#endif
 
 #if defined __USE_SVID || defined __USE_XOPEN
 /* The SVID says this is in <stdio.h>, but this seems a better place.	*/
@@ -551,9 +587,11 @@ extern int putenv (char *__string) __THROW __nonnull ((1));
    If REPLACE is nonzero, overwrite an existing value.  */
 extern int setenv (__const char *__name, __const char *__value, int __replace)
      __THROW __nonnull ((2));
+libc_hidden_proto(setenv)
 
 /* Remove the variable NAME from the environment.  */
 extern int unsetenv (__const char *__name) __THROW;
+libc_hidden_proto(unsetenv)
 #endif
 
 /* The following is used by uClibc in atexit.c and sysconf.c */
@@ -574,11 +612,13 @@ extern int clearenv (void) __THROW;
 
 
 #if defined __USE_MISC || defined __USE_XOPEN_EXTENDED
+# if defined __UCLIBC_SUSV3_LEGACY__
 /* Generate a unique temporary file name from TEMPLATE.
    The last six characters of TEMPLATE must be "XXXXXX";
    they are replaced with a string that makes the file name unique.
    Returns TEMPLATE, or a null pointer if it cannot get a unique file name.  */
 extern char *mktemp (char *__template) __THROW __nonnull ((1)) __wur;
+# endif
 
 /* Generate a unique temporary file name from TEMPLATE.
    The last six characters of TEMPLATE must be "XXXXXX";
@@ -586,7 +626,7 @@ extern char *mktemp (char *__template) __THROW __nonnull ((1)) __wur;
    Returns a file descriptor open on the file for reading and writing,
    or -1 if it cannot create a uniquely-named file.
 
-   This function is a possible cancellation points and therefore not
+   This function is a possible cancellation point and therefore not
    marked with __THROW.  */
 # ifndef __USE_FILE_OFFSET64
 extern int mkstemp (char *__template) __nonnull ((1)) __wur;
@@ -603,7 +643,7 @@ extern int mkstemp64 (char *__template) __nonnull ((1)) __wur;
 # endif
 #endif
 
-#ifdef __USE_BSD
+#if defined __USE_BSD || defined __USE_XOPEN2K8
 /* Create a unique temporary directory from TEMPLATE.
    The last six characters of TEMPLATE must be "XXXXXX";
    they are replaced with a string that makes the directory name unique.
@@ -622,24 +662,22 @@ extern int system (__const char *__command) __wur;
 __END_NAMESPACE_STD
 
 
-#if 0 /* def	__USE_GNU */
+#ifdef	__USE_GNU
 /* Return a malloc'd string containing the canonical absolute name of the
-   named file.  The last file name component need not exist, and may be a
-   symlink to a nonexistent file.  */
+   existing named file.  */
 extern char *canonicalize_file_name (__const char *__name)
      __THROW __nonnull ((1)) __wur;
 #endif
 
 #if defined __USE_BSD || defined __USE_XOPEN_EXTENDED
-/* Return the canonical absolute name of file NAME.  The last file name
-   component need not exist, and may be a symlink to a nonexistent file.
-   If RESOLVED is null, the result is malloc'd; otherwise, if the canonical
-   name is PATH_MAX chars or more, returns null with `errno' set to
-   ENAMETOOLONG; if the name fits in fewer than PATH_MAX chars, returns the
-   name in RESOLVED.  */
-/* we choose to handle __resolved==NULL as crash :) */
+/* Return the canonical absolute name of file NAME.  If RESOLVED is
+   null, the result is malloc'd; otherwise, if the canonical name is
+   PATH_MAX chars or more, returns null with `errno' set to
+   ENAMETOOLONG; if the name fits in fewer than PATH_MAX chars,
+   returns the name in RESOLVED.  */
 extern char *realpath (__const char *__restrict __name,
-		       char *__restrict __resolved) __THROW __wur __nonnull((2));
+		       char *__restrict __resolved) __THROW __wur;
+libc_hidden_proto(realpath)
 #endif
 
 
@@ -664,6 +702,7 @@ extern void *bsearch (__const void *__key, __const void *__base,
    using COMPAR to perform the comparisons.  */
 extern void qsort (void *__base, size_t __nmemb, size_t __size,
 		   __compar_fn_t __compar) __nonnull ((1, 4));
+libc_hidden_proto(qsort)
 
 
 /* Return the absolute value of X.  */
@@ -696,12 +735,11 @@ __END_NAMESPACE_C99
 #endif
 
 
-#if defined __USE_SVID || defined __USE_XOPEN_EXTENDED || defined __USE_BSD
+#if ( defined __USE_SVID || defined __USE_XOPEN_EXTENDED ) && defined __UCLIBC_HAS_FLOATS__
 /* Convert floating point numbers to strings.  The returned values are
    valid only until another call to the same function.  */
 
 # ifdef __UCLIBC_SUSV3_LEGACY__
-
 #if 0
 /* Convert VALUE to a string with NDIGIT digits and return a pointer to
    this.  Set *DECPT with the position of the decimal character and *SIGN
@@ -722,6 +760,7 @@ extern char *fcvt (double __value, int __ndigit, int *__restrict __decpt,
 extern char *gcvt (double __value, int __ndigit, char *__buf)
      __THROW __nonnull ((3)) __wur;
 # endif /* __UCLIBC_SUSV3_LEGACY__ */
+
 
 # if 0 /*def __USE_MISC*/
 /* Long double versions of above functions.  */
@@ -755,6 +794,7 @@ extern int qfcvt_r (long double __value, int __ndigit,
 # endif	/* misc */
 #endif	/* use MISC || use X/Open Unix */
 
+
 #ifdef __UCLIBC_HAS_WCHAR__
 __BEGIN_NAMESPACE_STD
 /* Return the length of the multibyte character
@@ -780,7 +820,7 @@ __END_NAMESPACE_STD
 #endif /* __UCLIBC_HAS_WCHAR__ */
 
 
-#ifdef __USE_SVID
+#if 0 /*def __USE_SVID*/
 /* Determine whether the string value of RESPONSE matches the affirmation
    or negative response expression as specified by the LC_MESSAGES category
    in the program's current locale.  Returns 1 if affirmative, 0 if
@@ -822,6 +862,7 @@ libc_hidden_proto(posix_openpt)
 #ifdef __USE_XOPEN
 /* The next four functions all take a master pseudo-tty fd and
    perform an operation on the associated slave:  */
+
 #ifdef __UCLIBC_HAS_PTY__
 /* Chown the slave to the calling user.  */
 extern int grantpt (int __fd) __THROW;
@@ -844,6 +885,7 @@ extern char *ptsname (int __fd) __THROW __wur;
    Return 0 on success, otherwise an error number.  */
 extern int ptsname_r (int __fd, char *__buf, size_t __buflen)
      __THROW __nonnull ((2));
+libc_hidden_proto(ptsname_r)
 # endif
 # if defined __UCLIBC_HAS_GETPT__
 /* Open a master pseudo terminal and return its file descriptor.  */
@@ -864,6 +906,13 @@ extern int getloadavg (double __loadavg[], int __nelem)
 extern uint32_t arc4random(void);
 extern void arc4random_stir(void);
 extern void arc4random_addrandom(unsigned char *, int);
+#endif
+
+#ifdef _LIBC
+extern int __drand48_iterate (unsigned short int xsubi[3], struct drand48_data *buffer) attribute_hidden;
+
+/* Global state for non-reentrant functions.  */
+extern struct drand48_data __libc_drand48_data attribute_hidden;
 #endif
 
 #endif /* don't just need malloc and calloc */

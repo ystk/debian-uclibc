@@ -1,4 +1,4 @@
-/* Wrapper arpund system calls to provide cancelation points.
+/* Wrapper arpund system calls to provide cancellation points.
    Copyright (C) 1996,1997,1998,1999,2000,2001 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Contributed by Ulrich Drepper <drepper@cygnus.com>, 1996.
@@ -37,39 +37,40 @@
 #ifndef __PIC__
 /* We need a hook to force this file to be linked in when static
    libpthread is used.  */
-const int __pthread_provide_wrappers = 0;
+const char __pthread_provide_wrappers = 0;
 #endif
 
-
-#define CANCELABLE_SYSCALL(res_type, name, param_list, params) \
-res_type __libc_##name param_list;					      \
-res_type								      \
-__attribute__ ((weak))							      \
-name param_list								      \
-{									      \
-  res_type result;							      \
-  int oldtype;								      \
-  pthread_setcanceltype (PTHREAD_CANCEL_ASYNCHRONOUS, &oldtype);	      \
-  result = __libc_##name params;					      \
-  pthread_setcanceltype (oldtype, NULL);				      \
-  return result;							      \
+/* Using private interface to libc (__libc_foo) to implement
+ * cancellable versions of some libc functions */
+#define CANCELABLE_SYSCALL(res_type, name, param_list, params)			\
+res_type __libc_##name param_list;						\
+res_type									\
+__attribute__ ((weak))								\
+name param_list									\
+{										\
+  res_type result;								\
+  int oldtype;									\
+  pthread_setcanceltype (PTHREAD_CANCEL_ASYNCHRONOUS, &oldtype);		\
+  result = __libc_##name params;						\
+  pthread_setcanceltype (oldtype, NULL);					\
+  return result;								\
 }
 
-#define CANCELABLE_SYSCALL_VA(res_type, name, param_list, params, last_arg) \
-res_type __libc_##name param_list;					      \
-res_type								      \
-__attribute__ ((weak))							      \
-name param_list								      \
-{									      \
-  res_type result;							      \
-  int oldtype;								      \
-  va_list ap;								      \
-  pthread_setcanceltype (PTHREAD_CANCEL_ASYNCHRONOUS, &oldtype);	      \
-  va_start (ap, last_arg);						      \
-  result = __libc_##name params;					      \
-  va_end (ap);								      \
-  pthread_setcanceltype (oldtype, NULL);				      \
-  return result;							      \
+#define CANCELABLE_SYSCALL_VA(res_type, name, param_list, params, last_arg)	\
+res_type __libc_##name param_list;						\
+res_type									\
+__attribute__ ((weak))								\
+name param_list									\
+{										\
+  res_type result;								\
+  int oldtype;									\
+  va_list ap;									\
+  pthread_setcanceltype (PTHREAD_CANCEL_ASYNCHRONOUS, &oldtype);		\
+  va_start (ap, last_arg);							\
+  result = __libc_##name params;						\
+  va_end (ap);									\
+  pthread_setcanceltype (oldtype, NULL);					\
+  return result;								\
 }
 
 
@@ -226,3 +227,16 @@ CANCELABLE_SYSCALL (ssize_t, sendto, (int fd, const __ptr_t buf, size_t n,
 				      socklen_t addr_len),
 		    (fd, buf, n, flags, addr, addr_len))
 #endif /* __UCLIBC_HAS_SOCKET__ */
+
+#ifdef  __UCLIBC_HAS_EPOLL__
+# ifdef __NR_epoll_wait
+CANCELABLE_SYSCALL (int, epoll_wait, (int epfd, struct epoll_event *events, int maxevents, int timeout),
+		    (epfd, events, maxevents, timeout))
+# endif
+# ifdef __NR_epoll_pwait
+#  include <signal.h>
+CANCELABLE_SYSCALL (int, epoll_pwait, (int epfd, struct epoll_event *events, int maxevents, int timeout,
+				       const sigset_t *set),
+		    (epfd, events, maxevents, timeout, set))
+# endif
+#endif

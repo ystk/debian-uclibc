@@ -45,20 +45,6 @@
 #include <sys/time.h>
 #include "tempname.h"
 
-/* Experimentally off - libc_hidden_proto(strlen) */
-/* Experimentally off - libc_hidden_proto(strcmp) */
-libc_hidden_proto(sprintf)
-libc_hidden_proto(mkdir)
-libc_hidden_proto(open)
-#ifdef __UCLIBC_HAS_LFS__
-libc_hidden_proto(open64)
-#endif
-libc_hidden_proto(read)
-libc_hidden_proto(close)
-libc_hidden_proto(getpid)
-libc_hidden_proto(stat)
-libc_hidden_proto(gettimeofday)
-
 /* Return nonzero if DIR is an existent directory.  */
 static int direxists (const char *dir)
 {
@@ -76,7 +62,10 @@ int attribute_hidden ___path_search (char *tmpl, size_t tmpl_len, const char *di
 	const char *pfx /*, int try_tmpdir*/)
 {
     /*const char *d; */
-    size_t dlen, plen;
+    /* dir and pfx lengths should always fit into an int,
+       so don't bother using size_t here.  Especially since
+       the printf func requires an int for precision (%*s).  */
+    int dlen, plen;
 
     if (!pfx || !pfx[0])
     {
@@ -182,14 +171,14 @@ static void brain_damaged_fillrand(unsigned char *buf, unsigned int len)
 
    KIND may be one of:
    __GT_NOCREATE:       simply verify that the name does not exist
-                        at the time of the call.
+                        at the time of the call. mode argument is ignored.
    __GT_FILE:           create the file using open(O_CREAT|O_EXCL)
-                        and return a read-write fd.  The file is mode 0600.
+                        and return a read-write fd with given mode.
    __GT_BIGFILE:        same as __GT_FILE but use open64().
-   __GT_DIR:            create a directory, which will be mode 0700.
+   __GT_DIR:            create a directory with given mode.
 
 */
-int attribute_hidden __gen_tempname (char *tmpl, int kind)
+int __gen_tempname (char *tmpl, int kind, mode_t mode)
 {
     char *XXXXXX;
     unsigned int i;
@@ -231,15 +220,15 @@ int attribute_hidden __gen_tempname (char *tmpl, int kind)
 			fd = 0;
 		}
 	    case __GT_FILE:
-		fd = open (tmpl, O_RDWR | O_CREAT | O_EXCL, S_IRUSR | S_IWUSR);
+		fd = open (tmpl, O_RDWR | O_CREAT | O_EXCL, mode);
 		break;
 #if defined __UCLIBC_HAS_LFS__
 	    case __GT_BIGFILE:
-		fd = open64 (tmpl, O_RDWR | O_CREAT | O_EXCL, S_IRUSR | S_IWUSR);
+		fd = open64 (tmpl, O_RDWR | O_CREAT | O_EXCL, mode);
 		break;
 #endif
 	    case __GT_DIR:
-		fd = mkdir (tmpl, S_IRUSR | S_IWUSR | S_IXUSR);
+		fd = mkdir (tmpl, mode);
 		break;
 	    default:
 		fd = -1;

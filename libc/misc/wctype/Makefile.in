@@ -5,6 +5,8 @@
 # Licensed under the LGPL v2.1, see the file COPYING.LIB in this tarball.
 #
 
+subdirs += libc/misc/wctype
+
 # multi source _wctype.c
 COM_SRC := \
 	iswalnum.c iswalpha.c iswcntrl.c iswdigit.c iswgraph.c \
@@ -28,7 +30,7 @@ MISC_WCTYPE_OBJ := $(patsubst %.c,$(MISC_WCTYPE_OUT)/%.o,$(CSRC))
 
 libc-y += $(MISC_WCTYPE_OBJ)
 
-objclean-y += misc_wctype_clean
+objclean-y += CLEAN_libc/misc/wctype
 
-misc_wctype_clean:
+CLEAN_libc/misc/wctype:
 	$(do_rm) $(addprefix $(MISC_WCTYPE_OUT)/*., o os)

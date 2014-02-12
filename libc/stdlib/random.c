@@ -27,10 +27,6 @@
 #include <stddef.h>
 #include <stdlib.h>
 
-libc_hidden_proto(random_r)
-libc_hidden_proto(srandom_r)
-libc_hidden_proto(setstate_r)
-libc_hidden_proto(initstate_r)
 
 /* POSIX.1c requires that there is mutual exclusion for the `rand' and
    `srand' functions to prevent concurrent calls from modifying common
@@ -74,11 +70,7 @@ __UCLIBC_MUTEX_STATIC(mylock, PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP);
 
 
 
-/* For each of the currently supported random number generators, we have a
-   break value on the amount of state information (you need at least this many
-   bytes of state info to support this random number generator), a degree for
-   the polynomial (actually a trinomial) that the R.N.G. is based on, and
-   separation between the two lower order coefficients of the trinomial.  */
+/* Keep constants in sync with random_r.c */
 
 /* Linear congruential.  */
 #define	TYPE_0		0
@@ -110,12 +102,7 @@ __UCLIBC_MUTEX_STATIC(mylock, PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP);
 #define	DEG_4		63
 #define	SEP_4		1
 
-
-/* Array versions of the above information to make code run faster.
-   Relies on fact that TYPE_i == i.  */
-
 #define	MAX_TYPES	5	/* Max number of types above.  */
-
 
 /* Initially, everything is set up as if from:
 	initstate(1, randtbl, 128);
@@ -244,7 +231,6 @@ char * setstate (char *arg_state)
    rear pointers can't wrap on the same call by not testing the rear
    pointer if the front one has wrapped.  Returns a 31-bit random number.  */
 
-libc_hidden_proto(random)
 long int random (void)
 {
   int32_t retval;

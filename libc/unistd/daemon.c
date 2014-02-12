@@ -46,16 +46,22 @@
 #include <paths.h>
 #include <signal.h>
 #include <unistd.h>
+#include <not-cancel.h>
+#include <errno.h>
+
+#ifdef __UCLIBC_HAS_THREADS_NATIVE__
+#include <sys/stat.h>
+#endif
+
+#ifdef __UCLIBC_HAS_LFS__
+#define STAT stat64
+#define FSTAT fstat64
+#else
+#define STAT stat
+#define FSTAT fstat
+#endif
 
 #if defined __USE_BSD || (defined __USE_XOPEN && !defined __USE_UNIX98)
-
-libc_hidden_proto(open)
-libc_hidden_proto(close)
-libc_hidden_proto(_exit)
-libc_hidden_proto(dup2)
-libc_hidden_proto(setsid)
-libc_hidden_proto(chdir)
-libc_hidden_proto(fork)
 
 #ifndef __ARCH_USE_MMU__
 #include <sys/syscall.h>
@@ -95,7 +101,7 @@ static inline pid_t fork_parent(void)
 }
 #endif
 
-int daemon( int nochdir, int noclose )
+int daemon(int nochdir, int noclose)
 {
 	int fd;
 
@@ -103,18 +109,36 @@ int daemon( int nochdir, int noclose )
 		return -1;
 
 	if (setsid() == -1)
-		return(-1);
+		return -1;
 
 	if (!nochdir)
 		chdir("/");
 
-	if (!noclose && (fd = open(_PATH_DEVNULL, O_RDWR, 0)) != -1) {
-		dup2(fd, STDIN_FILENO);
-		dup2(fd, STDOUT_FILENO);
-		dup2(fd, STDERR_FILENO);
-		if (fd > 2)
-			close(fd);
+	if (!noclose)
+	{
+		struct STAT st;
+
+		if ((fd = open_not_cancel(_PATH_DEVNULL, O_RDWR, 0)) != -1
+			&& (__builtin_expect (FSTAT (fd, &st), 0) == 0))
+		{
+			if (__builtin_expect (S_ISCHR (st.st_mode), 1) != 0) {
+				dup2(fd, STDIN_FILENO);
+				dup2(fd, STDOUT_FILENO);
+				dup2(fd, STDERR_FILENO);
+				if (fd > 2)
+					close(fd);
+			} else {
+				/* We must set an errno value since no
+				   function call actually failed.  */
+				close_not_cancel_no_status (fd);
+				__set_errno (ENODEV);
+				return -1;
+			}
+		} else {
+			close_not_cancel_no_status (fd);
+			return -1;
+		}
 	}
-	return(0);
+	return 0;
 }
 #endif

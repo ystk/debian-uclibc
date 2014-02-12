@@ -16,8 +16,6 @@
 #include <errno.h>
 #include <sys/mman.h>
 
-libc_hidden_proto(mmap)
-libc_hidden_proto(sbrk)
 
 #include "malloc.h"
 #include "heap.h"
@@ -28,12 +26,12 @@ libc_hidden_proto(sbrk)
 HEAP_DECLARE_STATIC_FREE_AREA (initial_fa, 256);
 struct heap_free_area *__malloc_heap = HEAP_INIT_WITH_FA (initial_fa);
 #ifdef HEAP_USE_LOCKING
-pthread_mutex_t __malloc_heap_lock = PTHREAD_MUTEX_INITIALIZER;
+malloc_mutex_t __malloc_heap_lock = PTHREAD_MUTEX_INITIALIZER;
 #endif
 
 #if defined(MALLOC_USE_LOCKING) && defined(MALLOC_USE_SBRK)
 /* A lock protecting our use of sbrk.  */
-pthread_mutex_t __malloc_sbrk_lock;
+malloc_mutex_t __malloc_sbrk_lock;
 #endif /* MALLOC_USE_LOCKING && MALLOC_USE_SBRK */
 
 
@@ -48,7 +46,7 @@ struct malloc_mmb *__malloc_mmapped_blocks = 0;
 HEAP_DECLARE_STATIC_FREE_AREA (initial_mmb_fa, 48); /* enough for 3 mmbs */
 struct heap_free_area *__malloc_mmb_heap = HEAP_INIT_WITH_FA (initial_mmb_fa);
 #ifdef HEAP_USE_LOCKING
-pthread_mutex_t __malloc_mmb_heap_lock = PTHREAD_MUTEX_INITIALIZER;
+malloc_mutex_t __malloc_mmb_heap_lock = PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP;
 #endif
 #endif /* __UCLIBC_UCLINUX_BROKEN_MUNMAP__ */
 
@@ -61,7 +59,7 @@ pthread_mutex_t __malloc_mmb_heap_lock = PTHREAD_MUTEX_INITIALIZER;
 static void *
 __malloc_from_heap (size_t size, struct heap_free_area **heap
 #ifdef HEAP_USE_LOCKING
-		, pthread_mutex_t *heap_lock
+		, malloc_mutex_t *heap_lock
 #endif
 		)
 {
@@ -126,7 +124,7 @@ __malloc_from_heap (size_t size, struct heap_free_area **heap
 		    MAP_PRIVATE | MAP_ANONYMOUS, 0, 0);
 #else
       block = mmap ((void *)0, block_size, PROT_READ | PROT_WRITE,
-		    MAP_SHARED | MAP_ANONYMOUS, 0, 0);
+		    MAP_SHARED | MAP_ANONYMOUS | MAP_UNINITIALIZE, 0, 0);
 #endif
 
 #endif /* MALLOC_USE_SBRK */
@@ -151,11 +149,12 @@ __malloc_from_heap (size_t size, struct heap_free_area **heap
 	  /* Try again to allocate.  */
 	  mem = __heap_alloc (heap, &size);
 
-	  __heap_unlock (heap_lock);
 
 #if !defined(MALLOC_USE_SBRK) && defined(__UCLIBC_UCLINUX_BROKEN_MUNMAP__)
 	  /* Insert a record of BLOCK in sorted order into the
 	     __malloc_mmapped_blocks list.  */
+
+	  new_mmb = malloc_from_heap (sizeof *new_mmb, &__malloc_mmb_heap, &__malloc_mmb_heap_lock);
 
 	  for (prev_mmb = 0, mmb = __malloc_mmapped_blocks;
 	       mmb;
@@ -163,7 +162,6 @@ __malloc_from_heap (size_t size, struct heap_free_area **heap
 	    if (block < mmb->mem)
 	      break;
 
-	  new_mmb = malloc_from_heap (sizeof *new_mmb, &__malloc_mmb_heap, &__malloc_mmb_heap_lock);
 	  new_mmb->next = mmb;
 	  new_mmb->mem = block;
 	  new_mmb->size = block_size;
@@ -177,6 +175,7 @@ __malloc_from_heap (size_t size, struct heap_free_area **heap
 			    (unsigned)new_mmb,
 			    (unsigned)new_mmb->mem, block_size);
 #endif /* !MALLOC_USE_SBRK && __UCLIBC_UCLINUX_BROKEN_MUNMAP__ */
+	  __heap_unlock (heap_lock);
 	}
     }
 

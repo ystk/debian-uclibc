@@ -20,7 +20,6 @@
 #include <signal.h>
 #include <errno.h>
 
-libc_hidden_proto(sigaction)
 
 /* If INTERRUPT is nonzero, make signal SIG interrupt system calls
    (causing them to fail with EINTR); if INTERRUPT is zero, make system
@@ -34,7 +33,8 @@ int siginterrupt (int sig, int interrupt)
 #ifdef	SA_RESTART
   struct sigaction action;
 
-  if (sigaction (sig, (struct sigaction *) NULL, &action) < 0)
+  /* Fails if sig is bad.  */
+  if (sigaction (sig, NULL, &action) < 0)
     return -1;
 
   if (interrupt)
@@ -48,10 +48,7 @@ int siginterrupt (int sig, int interrupt)
       action.sa_flags |= SA_RESTART;
     }
 
-  if (sigaction (sig, &action, (struct sigaction *) NULL) < 0)
-    return -1;
-
-  return 0;
+  return sigaction (sig, &action, NULL);
 #else
   __set_errno (ENOSYS);
   return -1;

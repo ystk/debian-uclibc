@@ -208,10 +208,12 @@ __BEGIN_DECLS
 /* Get file attributes for FILE and put them in BUF.  */
 extern int stat (__const char *__restrict __file,
 		 struct stat *__restrict __buf) __THROW __nonnull ((1, 2));
+libc_hidden_proto(stat)
 
 /* Get file attributes for the file, device, pipe, or socket
    that file descriptor FD is open on and put them in BUF.  */
 extern int fstat (int __fd, struct stat *__buf) __THROW __nonnull ((2));
+libc_hidden_proto(fstat)
 #else
 # ifdef __REDIRECT_NTH
 extern int __REDIRECT_NTH (stat, (__const char *__restrict __file,
@@ -228,6 +230,8 @@ extern int __REDIRECT_NTH (fstat, (int __fd, struct stat *__buf), fstat64)
 extern int stat64 (__const char *__restrict __file,
 		   struct stat64 *__restrict __buf) __THROW __nonnull ((1, 2));
 extern int fstat64 (int __fd, struct stat64 *__buf) __THROW __nonnull ((2));
+libc_hidden_proto(stat64)
+libc_hidden_proto(fstat64)
 #endif
 
 #ifdef __USE_ATFILE
@@ -262,6 +266,7 @@ extern int fstatat64 (int __fd, __const char *__restrict __file,
    If FILE is a symbolic link, do not follow it.  */
 extern int lstat (__const char *__restrict __file,
 		  struct stat *__restrict __buf) __THROW __nonnull ((1, 2));
+libc_hidden_proto(lstat)
 # else
 #  ifdef __REDIRECT_NTH
 extern int __REDIRECT_NTH (lstat,
@@ -276,6 +281,7 @@ extern int __REDIRECT_NTH (lstat,
 extern int lstat64 (__const char *__restrict __file,
 		    struct stat64 *__restrict __buf)
      __THROW __nonnull ((1, 2));
+libc_hidden_proto(lstat64)
 # endif
 #endif
 
@@ -283,6 +289,7 @@ extern int lstat64 (__const char *__restrict __file,
    If FILE is a symbolic link, this affects its target instead.  */
 extern int chmod (__const char *__file, __mode_t __mode)
      __THROW __nonnull ((1));
+libc_hidden_proto(chmod)
 
 #if 0 /*def __USE_BSD*/
 /* Set file access permissions for FILE to MODE.
@@ -320,6 +327,7 @@ extern __mode_t getumask (void) __THROW;
 /* Create a new directory named PATH, with permission bits MODE.  */
 extern int mkdir (__const char *__path, __mode_t __mode)
      __THROW __nonnull ((1));
+libc_hidden_proto(mkdir)
 
 #ifdef __USE_ATFILE
 /* Like mkdir, create a new directory with permission bits MODE.  But
@@ -335,6 +343,7 @@ extern int mkdirat (int __fd, __const char *__path, __mode_t __mode)
 #if defined __USE_MISC || defined __USE_BSD || defined __USE_XOPEN_EXTENDED
 extern int mknod (__const char *__path, __mode_t __mode, __dev_t __dev)
      __THROW __nonnull ((1));
+libc_hidden_proto(mknod)
 
 # ifdef __USE_ATFILE
 /* Like mknod, create a new device file with permission bits MODE and

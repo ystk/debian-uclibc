@@ -29,7 +29,9 @@
 
 #define __need_size_t
 #include <stddef.h>
+#ifdef _LIBC
 #include <bits/kernel_types.h>
+#endif
 
 /* Convenience types.  */
 typedef unsigned char __u_char;
@@ -197,9 +199,6 @@ __STD_TYPE __U32_TYPE __socklen_t;
 
 
 #undef __STD_TYPE
-
-/* Used in `struct shmid_ds'.  */
-typedef __kernel_ipc_pid_t __ipc_pid_t;
 
 /* Now add the thread types.  */
 #if defined __UCLIBC_HAS_THREADS__ && (defined __USE_POSIX199506 || defined __USE_UNIX98)

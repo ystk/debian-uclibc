@@ -27,8 +27,7 @@
 #include <limits.h>
 #include <stddef.h>
 #include <stdlib.h>
-
-
+#include <unistd.h>
 
 /* An improved random number generation package.  In addition to the standard
    rand()/srand() like interface, this package also has a special state info
@@ -109,8 +108,8 @@
 
 struct random_poly_info
 {
-    int seps[MAX_TYPES];
-    int degrees[MAX_TYPES];
+    smallint seps[MAX_TYPES];
+    smallint degrees[MAX_TYPES];
 };
 
 static const struct random_poly_info random_poly_info =
@@ -118,7 +117,6 @@ static const struct random_poly_info random_poly_info =
     { SEP_0, SEP_1, SEP_2, SEP_3, SEP_4 },
     { DEG_0, DEG_1, DEG_2, DEG_3, DEG_4 }
 };
-
 
 
 
@@ -133,7 +131,6 @@ static const struct random_poly_info random_poly_info =
    rear pointers can't wrap on the same call by not testing the rear
    pointer if the front one has wrapped.  Returns a 31-bit random number.  */
 
-libc_hidden_proto(random_r)
 int random_r(struct random_data *buf, int32_t *result)
 {
     int32_t *state;
@@ -191,7 +188,6 @@ libc_hidden_def(random_r)
    information a given number of times to get rid of any initial dependencies
    introduced by the L.C.R.N.G.  Note that the initialization of randtbl[]
    for default usage relies on values produced by this routine.  */
-libc_hidden_proto(srandom_r)
 int srandom_r (unsigned int seed, struct random_data *buf)
 {
     int type;
@@ -259,7 +255,6 @@ libc_hidden_def(srandom_r)
    Note: The first thing we do is save the current state, if any, just like
    setstate so that it doesn't matter when initstate is called.
    Returns a pointer to the old state.  */
-libc_hidden_proto(initstate_r)
 int initstate_r (unsigned int seed, char *arg_state, size_t n, struct random_data *buf)
 {
     int type;
@@ -318,7 +313,6 @@ libc_hidden_def(initstate_r)
    to the order in which things are done, it is OK to call setstate with the
    same state as the current state
    Returns a pointer to the old state information.  */
-libc_hidden_proto(setstate_r)
 int setstate_r (char *arg_state, struct random_data *buf)
 {
     int32_t *new_state = 1 + (int32_t *) arg_state;

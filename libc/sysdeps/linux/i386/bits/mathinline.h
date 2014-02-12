@@ -206,7 +206,7 @@ __NTH (__signbitl (long double __x))
   __MATH_INLINE float_type __NTH (func (float_type __x))		      \
   {									      \
     register float_type __result;					      \
-    __asm__ __volatile__ (op : "=t" (__result) : params);			      \
+    __asm__ __volatile__ (op : "=t" (__result) : params);		      \
     return __result;							      \
   }
 
@@ -529,8 +529,8 @@ __inline_mathcodeNP (tanh, __x, \
 
 __inline_mathcodeNP (floor, __x, \
   register long double __value;						      \
-  __volatile unsigned short int __cw;					      \
-  __volatile unsigned short int __cwtmp;				      \
+  __volatile__ unsigned short int __cw;					      \
+  __volatile__ unsigned short int __cwtmp;				      \
   __asm__ __volatile__ ("fnstcw %0" : "=m" (__cw));				      \
   __cwtmp = (__cw & 0xf3ff) | 0x0400; /* rounding down */		      \
   __asm__ __volatile__ ("fldcw %0" : : "m" (__cwtmp));			      \
@@ -540,8 +540,8 @@ __inline_mathcodeNP (floor, __x, \
 
 __inline_mathcodeNP (ceil, __x, \
   register long double __value;						      \
-  __volatile unsigned short int __cw;					      \
-  __volatile unsigned short int __cwtmp;				      \
+  __volatile__ unsigned short int __cw;					      \
+  __volatile__ unsigned short int __cwtmp;				      \
   __asm__ __volatile__ ("fnstcw %0" : "=m" (__cw));				      \
   __cwtmp = (__cw & 0xf3ff) | 0x0800; /* rounding up */			      \
   __asm__ __volatile__ ("fldcw %0" : : "m" (__cwtmp));			      \
@@ -713,10 +713,21 @@ __inline_mathcodeNP2 (drem, __x, __y, \
 __MATH_INLINE int
 __NTH (__finite (double __x))
 {
-  return (__extension__
-	  (((((union { double __d; int __i[2]; }) {__d: __x}).__i[1]
-	     | 0x800fffffu) + 1) >> 31));
+  union { double __d; int __i[2]; } u;
+  u.__d = __x;
+  /* Finite numbers have at least one zero bit in exponent. */
+  /* All other numbers will result in 0xffffffff after OR: */
+  return (u.__i[1] | 0x800fffff) != 0xffffffff;
 }
+
+__MATH_INLINE int
+__NTH (__finitef (float __x))
+{
+  union { float __d; int __i; } u;
+  u.__d = __x;
+  return (u.__i | 0x807fffff) != 0xffffffff;
+}
+
 
 /* Miscellaneous functions */
 # ifdef __FAST_MATH__

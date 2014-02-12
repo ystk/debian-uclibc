@@ -16,6 +16,8 @@
 # wcsftime
 #
 
+subdirs += libc/misc/wchar
+
 # multi source wchar.c
 CSRC :=	btowc.c wctob.c mbsinit.c mbrlen.c mbrtowc.c wcrtomb.c mbsrtowcs.c \
 	wcsrtombs.c _wchar_utf8sntowcs.c _wchar_wcsntoutf8s.c \
@@ -33,7 +35,7 @@ MISC_WCHAR_OBJ := $(patsubst %.c,$(MISC_WCHAR_OUT)/%.o,$(CSRC))
 
 libc-$(UCLIBC_HAS_WCHAR) += $(MISC_WCHAR_OBJ)
 
-objclean-y += misc_wchar_clean
+objclean-y += CLEAN_libc/misc/wchar
 
-misc_wchar_clean:
+CLEAN_libc/misc/wchar:
 	$(do_rm) $(addprefix $(MISC_WCHAR_OUT)/*., o os)

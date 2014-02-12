@@ -12,15 +12,9 @@
 #include <unistd.h>
 #include <sys/dir.h>
 #include <sys/stat.h>
+#include <not-cancel.h>
 #include <dirent.h>
 #include "dirstream.h"
-
-libc_hidden_proto(opendir)
-libc_hidden_proto(open)
-libc_hidden_proto(fcntl)
-libc_hidden_proto(close)
-libc_hidden_proto(stat)
-libc_hidden_proto(fstat)
 
 static DIR *fd_to_DIR(int fd, __blksize_t size)
 {
@@ -41,7 +35,7 @@ static DIR *fd_to_DIR(int fd, __blksize_t size)
 		free(ptr);
 		return NULL;
 	}
-	__pthread_mutex_init(&ptr->dd_lock, NULL);
+	__UCLIBC_MUTEX_INIT_VAR(ptr->dd_lock);
 
 	return ptr;
 }
@@ -88,31 +82,34 @@ DIR *opendir(const char *name)
 	}
 # define O_DIRECTORY 0
 #endif
-	if ((fd = open(name, O_RDONLY|O_NDELAY|O_DIRECTORY)) < 0)
+	fd = open_not_cancel_2(name, O_RDONLY|O_NDELAY|O_DIRECTORY|O_CLOEXEC);
+	if (fd < 0)
 		return NULL;
-
 	/* Note: we should check to make sure that between the stat() and open()
 	 * call, 'name' didnt change on us, but that's only if O_DIRECTORY isnt
 	 * defined and since Linux has supported it for like ever, i'm not going
 	 * to worry about it right now (if ever). */
-	if (fstat(fd, &statbuf) < 0)
-		goto close_and_ret;
+
+	if (fstat(fd, &statbuf) < 0) {
+		/* this close() never fails
+		 *int saved_errno;
+		 *saved_errno = errno; */
+		close_not_cancel_no_status(fd);
+		/*__set_errno(saved_errno);*/
+		return NULL;
+	}
 
 	/* According to POSIX, directory streams should be closed when
 	 * exec. From "Anna Pluzhnikov" <besp@midway.uchicago.edu>.
 	 */
-	if (fcntl(fd, F_SETFD, FD_CLOEXEC) < 0) {
-		int saved_errno;
-close_and_ret:
-		saved_errno = errno;
-		close(fd);
-		__set_errno(saved_errno);
-		return NULL;
-	}
+#ifndef __ASSUME_O_CLOEXEC
+	fcntl_not_cancel(fd, F_SETFD, FD_CLOEXEC);
+#endif
 
 	ptr = fd_to_DIR(fd, statbuf.st_blksize);
+
 	if (!ptr) {
-		close(fd);
+		close_not_cancel_no_status(fd);
 		__set_errno(ENOMEM);
 	}
 	return ptr;

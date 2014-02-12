@@ -15,8 +15,6 @@
 #include <unistd.h>
 #include <sys/mman.h>
 
-libc_hidden_proto(munmap)
-libc_hidden_proto(sbrk)
 
 #include "malloc.h"
 #include "heap.h"
@@ -30,7 +28,7 @@ libc_hidden_proto(sbrk)
 static void
 __free_to_heap (void *mem, struct heap_free_area **heap
 #ifdef HEAP_USE_LOCKING
-		, pthread_mutex_t *heap_lock
+		, malloc_mutex_t *heap_lock
 #endif
 	       )
 {
@@ -179,13 +177,13 @@ __free_to_heap (void *mem, struct heap_free_area **heap
 	      /* Start searching again from the end of this block.  */
 	      start = mmb_end;
 
+	      /* Release the descriptor block we used.  */
+	      free_to_heap (mmb, &__malloc_mmb_heap, &__malloc_mmb_heap_lock);
+
 	      /* We have to unlock the heap before we recurse to free the mmb
 		 descriptor, because we might be unmapping from the mmb
 		 heap.  */
               __heap_unlock (heap_lock);
-
-	      /* Release the descriptor block we used.  */
-	      free_to_heap (mmb, &__malloc_mmb_heap, &__malloc_mmb_heap_lock);
 
 	      /* Do the actual munmap.  */
 	      munmap ((void *)mmb_start, mmb_end - mmb_start);

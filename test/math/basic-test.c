@@ -18,6 +18,7 @@
    02111-1307 USA.  */
 
 #define _ISOC99_SOURCE
+
 #include <math.h>
 #include <float.h>
 #include <stdio.h>

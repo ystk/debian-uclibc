@@ -15,7 +15,11 @@ config UCLIBC_FORMAT_ELF
 	depends on ARCH_USE_MMU
 config UCLIBC_FORMAT_FDPIC_ELF
 	bool "FDPIC ELF"
-	depends on !ARCH_USE_MMU
+	depends on !ARCH_USE_MMU && (TARGET_bfin || TARGET_frv)
+	select DOPIC
+config UCLIBC_FORMAT_DSBT_ELF
+	bool "DBST ELF"
+	depends on !ARCH_USE_MMU && TARGET_c6x
 	select DOPIC
 config UCLIBC_FORMAT_FLAT
 	bool "STATIC FLAT"
@@ -159,6 +163,17 @@ config DO_C99_MATH
 
 	  If your applications require the newer C99 math library functions, 
 	  then answer Y.
+
+config DO_XSI_MATH
+	bool "Enable XSI math extensions to the ISO C standard (bessel)"
+	depends on UCLIBC_HAS_FLOATS
+	default n
+	help
+	  X/Open System Interfaces extensions to ISO C math functions
+	  (differential equation functions):
+
+	  j0, j1, jn - Bessel functions of the first kind
+	  y0, y1, yn - Bessel functions of the second kind
 
 config UCLIBC_HAS_FENV
 	bool "Enable C99 Floating-point environment"

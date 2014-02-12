@@ -17,7 +17,7 @@
    alignment can be a significant win on targets like m68k and Coldfire,
    where __alignof__(double) == 2.  */
 #define MALLOC_ALIGNMENT \
-  __alignof__ (double __attribute_aligned__ (sizeof (size_t)))
+  (__alignof__ (double) > sizeof (size_t) ? __alignof__ (double) : sizeof (size_t))
 
 /* The system pagesize... */
 extern size_t __pagesize;
@@ -130,21 +130,23 @@ extern int __malloc_mmb_debug;
 
 
 /* Locking for multithreaded apps.  */
-#if defined __UCLIBC_HAS_THREADS__ && defined __LINUXTHREADS_OLD__
+#ifdef __UCLIBC_HAS_THREADS__
 
-# include <pthread.h>
-# include <bits/uClibc_pthread.h>
+# include <bits/uClibc_mutex.h>
 
 # define MALLOC_USE_LOCKING
+
+typedef __UCLIBC_MUTEX_TYPE malloc_mutex_t;
+# define MALLOC_MUTEX_INIT	__UCLIBC_MUTEX_INITIALIZER
 
 # ifdef MALLOC_USE_SBRK
 /* This lock is used to serialize uses of the `sbrk' function (in both
    malloc and free, sbrk may be used several times in succession, and
    things will break if these multiple calls are interleaved with another
    thread's use of sbrk!).  */
-__UCLIBC_MUTEX_EXTERN(__malloc_sbrk_lock);
-#  define __malloc_lock_sbrk()	__UCLIBC_MUTEX_LOCK(__malloc_sbrk_lock)
-#  define __malloc_unlock_sbrk() __UCLIBC_MUTEX_UNLOCK(__malloc_sbrk_lock)
+extern malloc_mutex_t __malloc_sbrk_lock;
+#  define __malloc_lock_sbrk()	__UCLIBC_MUTEX_LOCK_CANCEL_UNSAFE (__malloc_sbrk_lock)
+#  define __malloc_unlock_sbrk() __UCLIBC_MUTEX_UNLOCK_CANCEL_UNSAFE (__malloc_sbrk_lock)
 # endif /* MALLOC_USE_SBRK */
 
 #else /* !__UCLIBC_HAS_THREADS__ */
@@ -219,10 +221,9 @@ extern void __malloc_debug_printf (int indent, const char *fmt, ...);
 
 /* The malloc heap.  */
 extern struct heap_free_area *__malloc_heap;
-#if defined __UCLIBC_HAS_THREADS__
-#include <bits/uClibc_mutex.h>
-__UCLIBC_MUTEX_EXTERN(__malloc_heap_lock);
+#ifdef __UCLIBC_HAS_THREADS__
+extern malloc_mutex_t __malloc_heap_lock;
 #ifdef __UCLIBC_UCLINUX_BROKEN_MUNMAP__
-__UCLIBC_MUTEX_EXTERN(__malloc_mmb_heap_lock);
+extern malloc_mutex_t __malloc_mmb_heap_lock;
 #endif
 #endif

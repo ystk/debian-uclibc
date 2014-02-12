@@ -17,17 +17,11 @@
    Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
    02111-1307 USA.  */
 
-#if HAVE_CONFIG_H
+#ifdef HAVE_CONFIG_H
 # include <config.h>
 #endif
 
-/* include unistd.h before we undefine _LIBC
- * because smallint is defined in unistd.h based
- * on _LIBC. For architectures that dont define
- * smallint of there own and rely upon the definition
- * from unistd.h will not build this file otherwise
- */
-
+/* unistd.h must be included with _LIBC defined: we need smallint */
 #include <unistd.h>
 #include <features.h>
 #ifdef __UCLIBC__
@@ -61,26 +55,7 @@
 #endif
 
 #ifdef __UCLIBC__
-#define __memset memset
-/* Experimentally off - libc_hidden_proto(memchr) */
-/* Experimentally off - libc_hidden_proto(memset) */
-/* Experimentally off - libc_hidden_proto(mempcpy) */
-/* Experimentally off - libc_hidden_proto(strcat) */
-/* Experimentally off - libc_hidden_proto(strcmp) */
-/*libc_hidden_proto(strchr)*/
-/*libc_hidden_proto(strchrnul)*/
-/* Experimentally off - libc_hidden_proto(strlen) */
-/* Experimentally off - libc_hidden_proto(strcoll) */
-#ifdef __UCLIBC_HAS_XLOCALE__
-libc_hidden_proto(__ctype_b_loc)
-libc_hidden_proto(__ctype_tolower_loc)
-#elif defined __UCLIBC_HAS_CTYPE_TABLES__
-libc_hidden_proto(__ctype_b)
-libc_hidden_proto(__ctype_tolower)
-#endif
-libc_hidden_proto(tolower)
-libc_hidden_proto(fnmatch)
-libc_hidden_proto(getenv)
+# define __memset memset
 #endif
 
 /* For platform which support the ISO C amendement 1 functionality we
@@ -89,22 +64,6 @@ libc_hidden_proto(getenv)
 /* Solaris 2.5 has a bug: <wchar.h> must be included before <wctype.h>.  */
 # include <wchar.h>
 # include <wctype.h>
-# ifdef __UCLIBC__
-libc_hidden_proto(wctype)
-libc_hidden_proto(iswctype)
-libc_hidden_proto(btowc)
-#  ifdef __UCLIBC_HAS_LOCALE__
-libc_hidden_proto(wmemchr)
-libc_hidden_proto(wmempcpy)
-libc_hidden_proto(wcscat)
-/*libc_hidden_proto(wcschr)*/
-/*libc_hidden_proto(wcschrnul)*/
-libc_hidden_proto(wcslen)
-libc_hidden_proto(wcscoll)
-libc_hidden_proto(towlower)
-libc_hidden_proto(mbsrtowcs)
-#  endif
-# endif
 #endif
 
 /* We need some of the locale data (the collation sequence information)
@@ -374,13 +333,6 @@ is_char_class (const wchar_t *wcs)
 
 #  include "fnmatch_loop.c"
 # endif
-
-#ifdef __UCLIBC_HAS_WCHAR__
-libc_hidden_proto(_stdlib_mb_cur_max)
-#else
-#undef MB_CUR_MAX
-#define MB_CUR_MAX 1
-#endif
 
 int
 fnmatch (const char *pattern, const char *string, int flags)

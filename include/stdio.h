@@ -143,6 +143,7 @@ extern FILE *stderr;        /* Standard error output stream.  */
 __BEGIN_NAMESPACE_STD
 /* Remove file FILENAME.  */
 extern int remove (__const char *__filename) __THROW;
+libc_hidden_proto(remove)
 /* Rename file OLD to NEW.  */
 extern int rename (__const char *__old, __const char *__new) __THROW;
 __END_NAMESPACE_STD
@@ -202,11 +203,13 @@ __BEGIN_NAMESPACE_STD
    This function is a possible cancellation point and therefore not
    marked with __THROW.  */
 extern int fclose (FILE *__stream);
+libc_hidden_proto(fclose)
 /* Flush STREAM, or all streams if STREAM is NULL.
 
    This function is a possible cancellation point and therefore not
    marked with __THROW.  */
 extern int fflush (FILE *__stream);
+libc_hidden_proto(fflush)
 __END_NAMESPACE_STD
 
 #ifdef __USE_MISC
@@ -217,6 +220,7 @@ __END_NAMESPACE_STD
    or due to the implementation it is a cancellation point and
    therefore not marked with __THROW.  */
 extern int fflush_unlocked (FILE *__stream);
+libc_hidden_proto(fflush_unlocked)
 #endif
 
 #ifdef __USE_GNU
@@ -238,6 +242,7 @@ __BEGIN_NAMESPACE_STD
    marked with __THROW.  */
 extern FILE *fopen (__const char *__restrict __filename,
 		    __const char *__restrict __modes) __wur;
+libc_hidden_proto(fopen)
 /* Open a file, replacing an existing stream with it.
 
    This function is a possible cancellation point and therefore not
@@ -263,6 +268,7 @@ __END_NAMESPACE_STD
 #ifdef __USE_LARGEFILE64
 extern FILE *fopen64 (__const char *__restrict __filename,
 		      __const char *__restrict __modes) __wur;
+libc_hidden_proto(fopen64)
 extern FILE *freopen64 (__const char *__restrict __filename,
 			__const char *__restrict __modes,
 			FILE *__restrict __stream) __wur;
@@ -271,6 +277,7 @@ extern FILE *freopen64 (__const char *__restrict __filename,
 #ifdef	__USE_POSIX
 /* Create a new stream that refers to an existing system file descriptor.  */
 extern FILE *fdopen (int __fd, __const char *__modes) __THROW __wur;
+libc_hidden_proto(fdopen)
 #endif
 
 #ifdef	__USE_GNU
@@ -280,6 +287,7 @@ extern FILE *fdopen (int __fd, __const char *__modes) __THROW __wur;
 extern FILE *fopencookie (void *__restrict __magic_cookie,
 			  __const char *__restrict __modes,
 			  _IO_cookie_io_functions_t __io_funcs) __THROW __wur;
+libc_hidden_proto(fopencookie)
 
 /* Create a new stream that refers to a memory buffer.  */
 extern FILE *fmemopen (void *__s, size_t __len, __const char *__modes)
@@ -290,6 +298,7 @@ extern FILE *fmemopen (void *__s, size_t __len, __const char *__modes)
    and the number of characters written on fflush or fclose.  */
 extern FILE *open_memstream (char **__restrict __bufloc,
 			     size_t *__restrict __sizeloc) __THROW __wur;
+libc_hidden_proto(open_memstream)
 #endif
 #endif
 
@@ -303,6 +312,7 @@ extern void setbuf (FILE *__restrict __stream, char *__restrict __buf) __THROW;
    else allocate an internal buffer N bytes long.  */
 extern int setvbuf (FILE *__restrict __stream, char *__restrict __buf,
 		    int __modes, size_t __n) __THROW;
+libc_hidden_proto(setvbuf)
 __END_NAMESPACE_STD
 
 #ifdef	__USE_BSD
@@ -323,14 +333,18 @@ __BEGIN_NAMESPACE_STD
    marked with __THROW.  */
 extern int fprintf (FILE *__restrict __stream,
 		    __const char *__restrict __format, ...);
+libc_hidden_proto(fprintf)
 /* Write formatted output to stdout.
 
    This function is a possible cancellation point and therefore not
    marked with __THROW.  */
 extern int printf (__const char *__restrict __format, ...);
+libc_hidden_proto(printf)
 /* Write formatted output to S.  */
 extern int sprintf (char *__restrict __s,
-		    __const char *__restrict __format, ...) __THROW;
+		    __const char *__restrict __format, ...)
+     __THROW __attribute__ ((__format__ (__printf__, 2, 3)));
+libc_hidden_proto(sprintf)
 
 /* Write formatted output to S from argument list ARG.
 
@@ -338,6 +352,7 @@ extern int sprintf (char *__restrict __s,
    marked with __THROW.  */
 extern int vfprintf (FILE *__restrict __s, __const char *__restrict __format,
 		     __gnuc_va_list __arg);
+libc_hidden_proto(vfprintf)
 /* Write formatted output to stdout from argument list ARG.
 
    This function is a possible cancellation point and therefore not
@@ -345,7 +360,8 @@ extern int vfprintf (FILE *__restrict __s, __const char *__restrict __format,
 extern int vprintf (__const char *__restrict __format, __gnuc_va_list __arg);
 /* Write formatted output to S from argument list ARG.  */
 extern int vsprintf (char *__restrict __s, __const char *__restrict __format,
-		     __gnuc_va_list __arg) __THROW;
+		     __gnuc_va_list __arg)
+     __THROW __attribute__ ((__format__ (__printf__, 2, 0)));
 __END_NAMESPACE_STD
 
 #if defined __USE_BSD || defined __USE_ISOC99 || defined __USE_UNIX98
@@ -354,10 +370,12 @@ __BEGIN_NAMESPACE_C99
 extern int snprintf (char *__restrict __s, size_t __maxlen,
 		     __const char *__restrict __format, ...)
      __THROW __attribute__ ((__format__ (__printf__, 3, 4)));
+libc_hidden_proto(snprintf)
 
 extern int vsnprintf (char *__restrict __s, size_t __maxlen,
 		      __const char *__restrict __format, __gnuc_va_list __arg)
      __THROW __attribute__ ((__format__ (__printf__, 3, 0)));
+libc_hidden_proto(vsnprintf)
 __END_NAMESPACE_C99
 #endif
 
@@ -367,6 +385,7 @@ __END_NAMESPACE_C99
 extern int vasprintf (char **__restrict __ptr, __const char *__restrict __f,
 		      __gnuc_va_list __arg)
      __THROW __attribute__ ((__format__ (__printf__, 2, 0))) __wur;
+libc_hidden_proto(vasprintf)
 #if 0 /* uClibc: disabled */
 extern int __asprintf (char **__restrict __ptr,
 		       __const char *__restrict __fmt, ...)
@@ -375,6 +394,7 @@ extern int __asprintf (char **__restrict __ptr,
 extern int asprintf (char **__restrict __ptr,
 		     __const char *__restrict __fmt, ...)
      __THROW __attribute__ ((__format__ (__printf__, 2, 3))) __wur;
+libc_hidden_proto(asprintf)
 
 /* Write formatted output to a file descriptor.
 
@@ -385,6 +405,7 @@ extern int asprintf (char **__restrict __ptr,
 extern int vdprintf (int __fd, __const char *__restrict __fmt,
 		     __gnuc_va_list __arg)
      __attribute__ ((__format__ (__printf__, 2, 0)));
+libc_hidden_proto(vdprintf)
 extern int dprintf (int __fd, __const char *__restrict __fmt, ...)
      __attribute__ ((__format__ (__printf__, 2, 3)));
 #endif
@@ -396,15 +417,20 @@ __BEGIN_NAMESPACE_STD
    This function is a possible cancellation point and therefore not
    marked with __THROW.  */
 extern int fscanf (FILE *__restrict __stream,
-		   __const char *__restrict __format, ...) __wur;
+		   __const char *__restrict __format, ...)
+     __attribute__ ((__format__ (__scanf__, 2, 3))) __wur;
+libc_hidden_proto(fscanf)
 /* Read formatted input from stdin.
 
    This function is a possible cancellation point and therefore not
    marked with __THROW.  */
-extern int scanf (__const char *__restrict __format, ...) __wur;
+extern int scanf (__const char *__restrict __format, ...)
+     __attribute__ ((__format__ (__scanf__, 1, 2))) __wur;
 /* Read formatted input from S.  */
 extern int sscanf (__const char *__restrict __s,
-		   __const char *__restrict __format, ...) __THROW;
+		   __const char *__restrict __format, ...)
+     __THROW __attribute__ ((__format__ (__scanf__, 2, 3)));
+libc_hidden_proto(sscanf)
 __END_NAMESPACE_STD
 
 #ifdef	__USE_ISOC99
@@ -416,6 +442,7 @@ __BEGIN_NAMESPACE_C99
 extern int vfscanf (FILE *__restrict __s, __const char *__restrict __format,
 		    __gnuc_va_list __arg)
      __attribute__ ((__format__ (__scanf__, 2, 0))) __wur;
+libc_hidden_proto(vfscanf)
 
 /* Read formatted input from stdin into argument list ARG.
 
@@ -428,6 +455,7 @@ extern int vscanf (__const char *__restrict __format, __gnuc_va_list __arg)
 extern int vsscanf (__const char *__restrict __s,
 		    __const char *__restrict __format, __gnuc_va_list __arg)
      __THROW __attribute__ ((__format__ (__scanf__, 2, 0)));
+libc_hidden_proto(vsscanf)
 __END_NAMESPACE_C99
 #endif /* Use ISO C9x.  */
 
@@ -438,6 +466,7 @@ __BEGIN_NAMESPACE_STD
    These functions are possible cancellation points and therefore not
    marked with __THROW.  */
 extern int fgetc (FILE *__stream);
+libc_hidden_proto(fgetc)
 extern int getc (FILE *__stream);
 
 /* Read a character from stdin.
@@ -457,7 +486,9 @@ __END_NAMESPACE_STD
    These functions are possible cancellation points and therefore not
    marked with __THROW.  */
 extern int getc_unlocked (FILE *__stream);
+libc_hidden_proto(getc_unlocked)
 extern int getchar_unlocked (void);
+libc_hidden_proto(getchar_unlocked)
 
 /* SUSv3 allows getc_unlocked to be a macro */
 #define getc_unlocked(_fp) __GETC_UNLOCKED(_fp)
@@ -471,6 +502,7 @@ extern int getchar_unlocked (void);
    or due to the implementation it is a cancellation point and
    therefore not marked with __THROW.  */
 extern int fgetc_unlocked (FILE *__stream);
+libc_hidden_proto(fgetc_unlocked)
 #endif /* Use MISC.  */
 
 
@@ -483,7 +515,9 @@ __BEGIN_NAMESPACE_STD
    These functions is a possible cancellation point and therefore not
    marked with __THROW.  */
 extern int fputc (int __c, FILE *__stream);
+libc_hidden_proto(fputc)
 extern int putc (int __c, FILE *__stream);
+libc_hidden_proto(putc)
 
 /* Write a character to stdout.
 
@@ -504,6 +538,7 @@ __END_NAMESPACE_STD
    or due to the implementation it is a cancellation point and
    therefore not marked with __THROW.  */
 extern int fputc_unlocked (int __c, FILE *__stream);
+libc_hidden_proto(fputc_unlocked)
 #endif /* Use MISC.  */
 
 #if defined __USE_POSIX || defined __USE_MISC
@@ -512,6 +547,7 @@ extern int fputc_unlocked (int __c, FILE *__stream);
    These functions are possible cancellation points and therefore not
    marked with __THROW.  */
 extern int putc_unlocked (int __c, FILE *__stream);
+libc_hidden_proto(putc_unlocked)
 extern int putchar_unlocked (int __c);
 
 /* SUSv3 allows putc_unlocked to be a macro */
@@ -536,6 +572,7 @@ __BEGIN_NAMESPACE_STD
    marked with __THROW.  */
 extern char *fgets (char *__restrict __s, int __n, FILE *__restrict __stream)
      __wur;
+libc_hidden_proto(fgets)
 
 /* Get a newline-terminated string from stdin, removing the newline.
    DO NOT USE THIS FUNCTION!!  There is no limit on how much it will read.
@@ -554,6 +591,7 @@ __END_NAMESPACE_STD
    therefore not marked with __THROW.  */
 extern char *fgets_unlocked (char *__restrict __s, int __n,
 			     FILE *__restrict __stream) __wur;
+libc_hidden_proto(fgets_unlocked)
 #endif
 
 
@@ -576,6 +614,7 @@ extern __ssize_t __getdelim (char **__restrict __lineptr,
 extern __ssize_t getdelim (char **__restrict __lineptr,
 			     size_t *__restrict __n, int __delimiter,
 			     FILE *__restrict __stream) __wur;
+libc_hidden_proto(getdelim)
 
 /* Like `getdelim', but reads up to a newline.
 
@@ -586,6 +625,7 @@ extern __ssize_t getdelim (char **__restrict __lineptr,
 extern __ssize_t getline (char **__restrict __lineptr,
 			    size_t *__restrict __n,
 			    FILE *__restrict __stream) __wur;
+libc_hidden_proto(getline)
 #endif
 
 
@@ -595,6 +635,7 @@ __BEGIN_NAMESPACE_STD
    This function is a possible cancellation points and therefore not
    marked with __THROW.  */
 extern int fputs (__const char *__restrict __s, FILE *__restrict __stream);
+libc_hidden_proto(fputs)
 
 /* Write a string, followed by a newline, to stdout.
 
@@ -608,6 +649,7 @@ extern int puts (__const char *__s);
    This function is a possible cancellation points and therefore not
    marked with __THROW.  */
 extern int ungetc (int __c, FILE *__stream);
+libc_hidden_proto(ungetc)
 
 
 /* Read chunks of generic data from STREAM.
@@ -616,12 +658,14 @@ extern int ungetc (int __c, FILE *__stream);
    marked with __THROW.  */
 extern size_t fread (void *__restrict __ptr, size_t __size,
 		     size_t __n, FILE *__restrict __stream) __wur;
+libc_hidden_proto(fread)
 /* Write chunks of generic data to STREAM.
 
    This function is a possible cancellation points and therefore not
    marked with __THROW.  */
 extern size_t fwrite (__const void *__restrict __ptr, size_t __size,
 		      size_t __n, FILE *__restrict __s) __wur;
+libc_hidden_proto(fwrite)
 __END_NAMESPACE_STD
 
 #ifdef __USE_GNU
@@ -633,6 +677,7 @@ __END_NAMESPACE_STD
    therefore not marked with __THROW.  */
 extern int fputs_unlocked (__const char *__restrict __s,
 			   FILE *__restrict __stream);
+libc_hidden_proto(fputs_unlocked)
 #endif
 
 #ifdef __USE_MISC
@@ -644,8 +689,10 @@ extern int fputs_unlocked (__const char *__restrict __s,
    therefore not marked with __THROW.  */
 extern size_t fread_unlocked (void *__restrict __ptr, size_t __size,
 			      size_t __n, FILE *__restrict __stream) __wur;
+libc_hidden_proto(fread_unlocked)
 extern size_t fwrite_unlocked (__const void *__restrict __ptr, size_t __size,
 			       size_t __n, FILE *__restrict __stream) __wur;
+libc_hidden_proto(fwrite_unlocked)
 #endif
 
 
@@ -655,16 +702,19 @@ __BEGIN_NAMESPACE_STD
    This function is a possible cancellation point and therefore not
    marked with __THROW.  */
 extern int fseek (FILE *__stream, long int __off, int __whence);
+libc_hidden_proto(fseek)
 /* Return the current position of STREAM.
 
    This function is a possible cancellation point and therefore not
    marked with __THROW.  */
 extern long int ftell (FILE *__stream) __wur;
+libc_hidden_proto(ftell)
 /* Rewind to the beginning of STREAM.
 
    This function is a possible cancellation point and therefore not
    marked with __THROW.  */
 extern void rewind (FILE *__stream);
+libc_hidden_proto(rewind)
 __END_NAMESPACE_STD
 
 /* The Single Unix Specification, Version 2, specifies an alternative,
@@ -724,7 +774,9 @@ __END_NAMESPACE_STD
 
 #ifdef __USE_LARGEFILE64
 extern int fseeko64 (FILE *__stream, __off64_t __off, int __whence);
+libc_hidden_proto(fseeko64)
 extern __off64_t ftello64 (FILE *__stream) __wur;
+libc_hidden_proto(ftello64)
 extern int fgetpos64 (FILE *__restrict __stream, fpos64_t *__restrict __pos);
 extern int fsetpos64 (FILE *__stream, __const fpos64_t *__pos);
 #endif
@@ -752,6 +804,7 @@ __BEGIN_NAMESPACE_STD
    This function is a possible cancellation point and therefore not
    marked with __THROW.  */
 extern void perror (__const char *__s);
+libc_hidden_proto(perror)
 __END_NAMESPACE_STD
 
 #ifdef __UCLIBC_HAS_SYS_ERRLIST__
@@ -767,11 +820,13 @@ extern __const char *__const sys_errlist[];
 #ifdef	__USE_POSIX
 /* Return the system file descriptor for STREAM.  */
 extern int fileno (FILE *__stream) __THROW __wur;
+libc_hidden_proto(fileno)
 #endif /* Use POSIX.  */
 
 #ifdef __USE_MISC
 /* Faster version when locking is not required.  */
 extern int fileno_unlocked (FILE *__stream) __THROW __wur;
+libc_hidden_proto(fileno_unlocked)
 #endif
 
 

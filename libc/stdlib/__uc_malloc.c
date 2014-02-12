@@ -22,9 +22,6 @@ Cambridge, MA 02139, USA.
 #include <unistd.h>
 #include <malloc.h>
 
-libc_hidden_proto(_exit)
-libc_hidden_proto(__uc_malloc)
-libc_hidden_proto(__uc_malloc_failed)
 
 void (*__uc_malloc_failed)(size_t size) = NULL;
 /* Seemingly superfluous assigment of NULL above prevents gas error
@@ -42,6 +39,7 @@ void *__uc_malloc(size_t size)
 			return p;
 		if (!__uc_malloc_failed)
 			_exit(1);
+		free(p);
 		__uc_malloc_failed(size);
 	}
 }

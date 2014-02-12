@@ -9,16 +9,14 @@
 
 #include <sys/syscall.h>
 #include <sys/stat.h>
-#include <sys/sysmacros.h>
-
-libc_hidden_proto(mknod)
-
-#define __NR___syscall_mknod __NR_mknod
-static __inline__ _syscall3(int, __syscall_mknod, const char *, path,
-		__kernel_mode_t, mode, __kernel_dev_t, dev)
 
 int mknod(const char *path, mode_t mode, dev_t dev)
 {
-	return __syscall_mknod(path, mode, (__kernel_dev_t)dev);
+	unsigned long long int k_dev;
+
+	/* We must convert the value to dev_t type used by the kernel.  */
+	k_dev = (dev) & ((1ULL << 32) - 1);
+
+	return INLINE_SYSCALL(mknod, 3, path, mode, (unsigned int)k_dev);
 }
 libc_hidden_def(mknod)
