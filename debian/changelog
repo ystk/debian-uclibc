@@ -1,3 +1,9 @@
+uclibc (0.9.30.2-1skerlet1) unstable; urgency=low
+
+  * Adapt to Skerlet
+
+ -- Skerlet Project Team <skerlet@swc.toshiba.co.jp>  Fri, 06 Feb 2015 10:13:58 +0900
+
 uclibc (0.9.30.2-1) unstable; urgency=low
 
   * New upstream release

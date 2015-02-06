@@ -52,7 +52,8 @@ arch_uclibc_linux_powerpc_debian = powerpc
 
 vendor = $(shell \
     dpkg-vendor --derives-from emdebian && echo emdebian || \
-    dpkg-vendor --derives-from debian && echo debian)
+    dpkg-vendor --derives-from debian && echo debian || \
+    dpkg-vendor --derives-from skerlet && echo debian)
 
 ifeq ($(vendor),)
 $(error Vendor not supported)
